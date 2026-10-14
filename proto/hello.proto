@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package hello;
+
+option go_package = "grpc-learning/gen/hello;hellopb";
+
+// Request dari client: hanya membawa 1 string nama
+message HelloRequest {
+  string name = 1;
+}
+
+// Response dari server: hanya membawa 1 string pesan
+message HelloResponse {
+  string message = 1;
+}
+
+// Service: mendefinisikan fungsi yang bisa dipanggil
+service Greeter {
+  rpc SayHello (HelloRequest) returns (HelloResponse);
+}

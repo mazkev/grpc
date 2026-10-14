@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -73,6 +74,39 @@ func main() {
 		} else {
 			fmt.Printf("Bukan error gRPC: %v\n", err)
 		}
+	}
+
+	// =========================================================
+	// TEST KASUS 3: SERVER STREAMING (ListUsers)
+	// =========================================================
+	fmt.Println("\n▶️ [Kasus 3] Server Streaming: Mengambil semua user (ListUsers)")
+
+	ctxStream, cancelStream := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelStream()
+
+	// Panggil method server streaming
+	stream, err := client.ListUsers(ctxStream, &userpb.ListUsersRequest{})
+	if err != nil {
+		log.Fatalf("Gagal memanggil ListUsers: %v", err)
+	}
+
+	fmt.Println("📡 Menunggu stream data mengalir dari server...")
+	itemCount := 0
+	for {
+		// Terima data dari stream satu per satu
+		streamResp, err := stream.Recv()
+		if err == io.EOF {
+			// io.EOF berarti server sudah selesai mengirim seluruh stream
+			fmt.Println("🏁 [Client] Sinyal EOF diterima: Server telah selesai streaming.")
+			break
+		}
+		if err != nil {
+			log.Fatalf("Error saat menerima stream: %v", err)
+		}
+
+		itemCount++
+		u := streamResp.GetUser()
+		fmt.Printf("   📥 [Item %d Masuk] %s (%s) - Email: %s\n", itemCount, u.GetName(), u.GetId(), u.GetEmail())
 	}
 
 	fmt.Println("\n=====================================================")

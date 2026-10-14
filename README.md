@@ -5,10 +5,11 @@ Repository ini berisi materi dan kode implementasi hands-on untuk memahami konse
 ---
 
 ## 📌 Apa yang Dipelajari?
-- **Protocol Buffers (Protobuf v3)**: Membuat file kontrak `.proto` (`User`, `GetUserRequest`, `UserResponse`).
+- **Protocol Buffers (Protobuf v3)**: Membuat file kontrak `.proto` (`User`, `GetUserRequest`, `UserResponse`, `ListUsersRequest`).
 - **Compiler `protoc`**: Melakukan generate otomatis struct Go dan interface RPC dari schema proto.
-- **gRPC Server**: Mengimplementasikan service `UserService`, menangani koneksi TCP di port `:50051`.
-- **gRPC Client**: Melakukan *Remote Procedure Call* ke server dan membaca respons.
+- **Unary RPC (`GetUser`)**: 1 request masuk -> 1 response keluar.
+- **Server Streaming RPC (`ListUsers`)**: 1 request masuk -> server mengalirkan data satu per satu.
+- **gRPC Server & Client**: Mengimplementasikan service dan menghubungkan client via HTTP/2.
 - **Error Handling**: Menangani kode error terstandar gRPC (`codes.NotFound`).
 
 ---

@@ -24,8 +24,16 @@ message UserResponse {
   User user = 1;
 }
 
+// Request untuk Server Streaming: meminta semua daftar user
+message ListUsersRequest {}
+
 // 4. Service: kumpulan fungsi (RPC) yang disediakan oleh server
 service UserService {
   // Unary RPC: 1 request masuk -> 1 response keluar
   rpc GetUser(GetUserRequest) returns (UserResponse);
+
+  // Server Streaming RPC: 1 request masuk -> banyak stream response keluar
+  // Perhatikan kata kunci 'stream' di depan tipe balasan!
+  rpc ListUsers(ListUsersRequest) returns (stream UserResponse);
 }
+

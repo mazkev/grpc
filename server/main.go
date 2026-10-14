@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	// Import hasil generate dari folder gen/user
 	userpb "grpc-learning/gen/user"
@@ -58,6 +59,24 @@ func (s *userServer) GetUser(ctx context.Context, req *userpb.GetUserRequest) (*
 		User: user,
 	}, nil
 }
+
+// 3. Server Streaming: Mengirim data user satu per satu secara streaming ke client
+func (s *userServer) ListUsers(req *userpb.ListUsersRequest, stream grpc.ServerStreamingServer[userpb.UserResponse]) error {
+	log.Printf("[Server] Menerima request ListUsers. Mulai streaming %d user...", len(s.db))
+
+	for _, user := range s.db {
+		log.Printf("[Server] Mengirim user lewat stream: %s (%s)", user.GetName(), user.GetId())
+		if err := stream.Send(&userpb.UserResponse{User: user}); err != nil {
+			return err
+		}
+		// Beri jeda 800ms agar kita bisa mengamati streaming secara visual
+		time.Sleep(800 * time.Millisecond)
+	}
+
+	log.Println("[Server] Selesai mengirim seluruh stream user.")
+	return nil
+}
+
 
 func main() {
 	port := ":50051"

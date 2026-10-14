@@ -1,35 +1,55 @@
-# 🚀 Belajar gRPC dengan Go (Golang)
+# 🛍️ Studi Kasus Microservices: Order Service ➔ Payment Service via gRPC
 
-Repository ini berisi materi dan kode implementasi hands-on untuk memahami konsep dasar hingga praktik nyata **gRPC (Google Remote Procedure Call)** di Go.
+Proyek ini mendemonstrasikan bagaimana **dua backend independen** saling berkomunikasi secara cepat dan efisien menggunakan **gRPC (HTTP/2 + Protocol Buffers)**.
 
 ---
 
-## 📌 Apa yang Dipelajari?
-Lengkap dengan **4 Pola Komunikasi Utama gRPC**:
-1. **Unary RPC (`GetUser`)**: 1 request masuk -> 1 response keluar (mirip REST API biasa).
-2. **Server Streaming RPC (`ListUsers`)**: 1 request masuk -> server mengalirkan data satu per satu ke client.
-3. **Client Streaming RPC (`CreateUsers`)**: Client mengalirkan batch data ke server -> server membalas 1 ringkasan (*summary*).
-4. **Bidirectional Streaming RPC (`UserChat`)**: Client dan server saling bertukar stream data secara bersamaan (*full-duplex real-time*).
-- **Protocol Buffers (Protobuf v3)**: Kontrak data terstruktur yang dikompilasi dengan `protoc`.
-- **gRPC Server & Client**: Arsitektur jaringan berbasis HTTP/2 di Go.
-- **Error Handling**: Kode error terstandar gRPC (`codes.NotFound`).
+## 🏛️ Arsitektur Sistem
+
+```text
+[Pembeli Buat Pesanan]
+          │
+          ▼
+┌────────────────────────────────────────┐
+│  🛒 BACKEND 1: ORDER SERVICE           │
+│  (order-service/main.go)               │
+│                                        │
+│  • Menerima pesanan baru               │
+│  • Mengontak Payment Service via gRPC  │
+│  • Mengonfirmasi / membatalkan order   │
+└──────────────────┬─────────────────────┘
+                   │
+                   │ ⚡ gRPC Call: ProcessPayment()
+                   │    Input : { order_id, user_id, amount }
+                   │    Output: { payment_id, success, message }
+                   ▼
+┌────────────────────────────────────────┐
+│  🏦 BACKEND 2: PAYMENT SERVICE         │
+│  (payment-service/main.go)             │
+│                                        │
+│  • Port :50051 (gRPC Server)           │
+│  • Mengelola saldo dompet pengguna     │
+│  • Memotong saldo & mengembalikan ID   │
+└────────────────────────────────────────┘
+```
 
 ---
 
 ## 📁 Struktur Direktori
+
 ```text
 .
 ├── proto/
-│   └── user/
-│       └── user.proto      # Kontrak Protobuf (Data model & RPC service)
+│   └── payment/
+│       └── payment.proto      # KONTRAK: Format pesan & method ProcessPayment
 ├── gen/
-│   └── user/               # Hasil generate protoc (JANGAN diedit manual)
-│       ├── user.pb.go
-│       └── user_grpc.pb.go
-├── server/
-│   └── main.go             # Implementasi gRPC Server
-├── client/
-│   └── main.go             # Implementasi gRPC Client
+│   └── payment/               # Kode Go hasil kompilasi protoc
+│       ├── payment.pb.go
+│       └── payment_grpc.pb.go
+├── payment-service/
+│   └── main.go                # Backend 1: Payment Service (gRPC Server)
+├── order-service/
+│   └── main.go                # Backend 2: Order Service (gRPC Client)
 ├── .gitignore
 ├── go.mod
 └── go.sum
@@ -37,21 +57,20 @@ Lengkap dengan **4 Pola Komunikasi Utama gRPC**:
 
 ---
 
-## 🛠️ Cara Menjalankan
+## 🚀 Cara Menjalankan
 
-### 1. Compile Protobuf (Opsional jika mengubah `.proto`)
-```powershell
-protoc --proto_path=. --go_out=. --go_opt=module=grpc-learning --go-grpc_out=. --go-grpc_opt=module=grpc-learning proto/user/user.proto
-```
+Buka **dua jendela terminal** terpisah di folder ini:
 
-### 2. Jalankan Server (Terminal 1)
+### Langkah 1: Jalankan Backend Payment Service (Terminal 1)
 ```powershell
-go run ./server/main.go
+go run ./payment-service/main.go
 ```
-*Server akan berjalan di port `:50051`.*
+*Payment Service akan aktif di port `:50051` menunggu permintaan pembayaran.*
 
-### 3. Jalankan Client (Terminal 2)
+### Langkah 2: Jalankan Backend Order Service (Terminal 2)
 ```powershell
-go run ./client/main.go
+go run ./order-service/main.go
 ```
-*Client akan memanggil RPC `GetUser` untuk user yang ada (`usr-1`) dan menguji error handling untuk user yang tidak ada (`usr-999`).*
+*Order Service akan mensimulasikan 2 transaksi pembelian nyata:*
+1. **Transaksi 1 (Berhasil)**: `USER-1` belanja Sepatu Rp 200.000 (Saldo Rp 500.000 $\rightarrow$ Saldo dipotong dan order dikonfirmasi).
+2. **Transaksi 2 (Gagal)**: `USER-2` belanja Laptop Rp 1.500.000 (Saldo Rp 50.000 $\rightarrow$ Pembayaran ditolak dan order dibatalkan).

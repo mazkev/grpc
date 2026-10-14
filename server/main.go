@@ -120,6 +120,36 @@ func (s *userServer) CreateUsers(stream grpc.ClientStreamingServer[userpb.Create
 	}
 }
 
+// 5. Bidirectional Streaming: Client dan Server saling berkirim pesan secara bersamaan
+func (s *userServer) UserChat(stream grpc.BidiStreamingServer[userpb.ChatMessage, userpb.ChatResponse]) error {
+	log.Println("[Server] Sesi UserChat (Bidirectional Streaming) telah dibuka.")
+
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			log.Println("[Server] Client menutup sesi chat (EOF).")
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		log.Printf("[Server] [Chat Masuk] Dari '%s': %s", req.GetUserId(), req.GetMessage())
+
+		// Server langsung membalas ke stream secara real-time
+		broadcastMsg := fmt.Sprintf("Halo %s, server menerima pesanmu: '%s'", req.GetUserId(), req.GetMessage())
+		resp := &userpb.ChatResponse{
+			ServerTime:       time.Now().Format("15:04:05.000"),
+			BroadcastMessage: broadcastMsg,
+		}
+
+		if err := stream.Send(resp); err != nil {
+			return err
+		}
+	}
+}
+
+
 
 func main() {
 	port := ":50051"

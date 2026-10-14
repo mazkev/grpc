@@ -147,6 +147,63 @@ func main() {
 	fmt.Printf("   • Total User Berhasil Dibuat: %d\n", summary.GetTotalCreated())
 	fmt.Printf("   • Daftar ID yang Diberikan  : %v\n", summary.GetIds())
 
+	// =========================================================
+	// TEST KASUS 5: BIDIRECTIONAL STREAMING (UserChat)
+	// =========================================================
+	fmt.Println("\n▶️ [Kasus 5] Bidirectional Streaming: Sesi Chat Real-time (UserChat)")
+
+	ctxBidi, cancelBidi := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelBidi()
+
+	// Inisialisasi stream 2 arah
+	chatStream, err := client.UserChat(ctxBidi)
+	if err != nil {
+		log.Fatalf("Gagal membuka stream UserChat: %v", err)
+	}
+
+	// Goroutine terpisah untuk menerima stream balasan dari server secara asynchronous
+	waitChannel := make(chan struct{})
+	go func() {
+		for {
+			in, err := chatStream.Recv()
+			if err == io.EOF {
+				// Server selesai mengirim stream
+				close(waitChannel)
+				return
+			}
+			if err != nil {
+				log.Printf("Error menerima stream balasan chat: %v", err)
+				close(waitChannel)
+				return
+			}
+			fmt.Printf("   💬 [Balasan Server @ %s]: %s\n", in.GetServerTime(), in.GetBroadcastMessage())
+		}
+	}()
+
+	// Mengirim beberapa pesan chat dari client
+	chatMessages := []string{
+		"Halo Server, apa kabar?",
+		"Saya sedang menguji Bidirectional Streaming gRPC",
+		"Hebat sekali, koneksinya sangat cepat dan real-time!",
+	}
+
+	for _, msg := range chatMessages {
+		fmt.Printf("   📤 [Client Kirim]: %s\n", msg)
+		err := chatStream.Send(&userpb.ChatMessage{
+			UserId:  "usr-1",
+			Message: msg,
+		})
+		if err != nil {
+			log.Fatalf("Gagal mengirim pesan chat: %v", err)
+		}
+		time.Sleep(600 * time.Millisecond) // Jeda antar chat
+	}
+
+	// Beritahu server bahwa client sudah selesai mengirim
+	chatStream.CloseSend()
+	<-waitChannel
+	fmt.Println("🏁 [Client] Sesi chat dua arah selesai.")
+
 	fmt.Println("\n=====================================================")
 	fmt.Println("🎉 Pengujian Client Selesai dengan Sukses!")
 	fmt.Println("=====================================================")

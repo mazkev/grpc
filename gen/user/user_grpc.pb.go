@@ -22,6 +22,7 @@ const (
 	UserService_GetUser_FullMethodName     = "/user.UserService/GetUser"
 	UserService_ListUsers_FullMethodName   = "/user.UserService/ListUsers"
 	UserService_CreateUsers_FullMethodName = "/user.UserService/CreateUsers"
+	UserService_UserChat_FullMethodName    = "/user.UserService/UserChat"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -38,6 +39,9 @@ type UserServiceClient interface {
 	// Client Streaming RPC: banyak stream request masuk -> 1 summary response keluar
 	// Perhatikan kata kunci 'stream' di depan parameter input!
 	CreateUsers(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[CreateUserRequest, CreateUsersSummary], error)
+	// Bidirectional Streaming RPC: stream request <-> stream response (real-time dua arah)
+	// Perhatikan kata kunci 'stream' ada di kedua sisi (input dan output)!
+	UserChat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChatMessage, ChatResponse], error)
 }
 
 type userServiceClient struct {
@@ -90,6 +94,19 @@ func (c *userServiceClient) CreateUsers(ctx context.Context, opts ...grpc.CallOp
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type UserService_CreateUsersClient = grpc.ClientStreamingClient[CreateUserRequest, CreateUsersSummary]
 
+func (c *userServiceClient) UserChat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChatMessage, ChatResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &UserService_ServiceDesc.Streams[2], UserService_UserChat_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ChatMessage, ChatResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type UserService_UserChatClient = grpc.BidiStreamingClient[ChatMessage, ChatResponse]
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -104,6 +121,9 @@ type UserServiceServer interface {
 	// Client Streaming RPC: banyak stream request masuk -> 1 summary response keluar
 	// Perhatikan kata kunci 'stream' di depan parameter input!
 	CreateUsers(grpc.ClientStreamingServer[CreateUserRequest, CreateUsersSummary]) error
+	// Bidirectional Streaming RPC: stream request <-> stream response (real-time dua arah)
+	// Perhatikan kata kunci 'stream' ada di kedua sisi (input dan output)!
+	UserChat(grpc.BidiStreamingServer[ChatMessage, ChatResponse]) error
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -122,6 +142,9 @@ func (UnimplementedUserServiceServer) ListUsers(*ListUsersRequest, grpc.ServerSt
 }
 func (UnimplementedUserServiceServer) CreateUsers(grpc.ClientStreamingServer[CreateUserRequest, CreateUsersSummary]) error {
 	return status.Errorf(codes.Unimplemented, "method CreateUsers not implemented")
+}
+func (UnimplementedUserServiceServer) UserChat(grpc.BidiStreamingServer[ChatMessage, ChatResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method UserChat not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -180,6 +203,13 @@ func _UserService_CreateUsers_Handler(srv interface{}, stream grpc.ServerStream)
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type UserService_CreateUsersServer = grpc.ClientStreamingServer[CreateUserRequest, CreateUsersSummary]
 
+func _UserService_UserChat_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(UserServiceServer).UserChat(&grpc.GenericServerStream[ChatMessage, ChatResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type UserService_UserChatServer = grpc.BidiStreamingServer[ChatMessage, ChatResponse]
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -201,6 +231,12 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "CreateUsers",
 			Handler:       _UserService_CreateUsers_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "UserChat",
+			Handler:       _UserService_UserChat_Handler,
+			ServerStreams: true,
 			ClientStreams: true,
 		},
 	},

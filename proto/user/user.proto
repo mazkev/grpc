@@ -39,6 +39,18 @@ message CreateUsersSummary {
   repeated string ids = 2; // 'repeated' mirip slice/array di Go
 }
 
+// Pesan untuk Bidirectional Streaming: pesan chat dari client
+message ChatMessage {
+  string user_id = 1;
+  string message = 2;
+}
+
+// Balasan untuk Bidirectional Streaming: siaran chat dari server
+message ChatResponse {
+  string server_time = 1;
+  string broadcast_message = 2;
+}
+
 // 4. Service: kumpulan fungsi (RPC) yang disediakan oleh server
 service UserService {
   // Unary RPC: 1 request masuk -> 1 response keluar
@@ -51,6 +63,11 @@ service UserService {
   // Client Streaming RPC: banyak stream request masuk -> 1 summary response keluar
   // Perhatikan kata kunci 'stream' di depan parameter input!
   rpc CreateUsers(stream CreateUserRequest) returns (CreateUsersSummary);
+
+  // Bidirectional Streaming RPC: stream request <-> stream response (real-time dua arah)
+  // Perhatikan kata kunci 'stream' ada di kedua sisi (input dan output)!
+  rpc UserChat(stream ChatMessage) returns (stream ChatResponse);
 }
+
 
 

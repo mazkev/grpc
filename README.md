@@ -5,13 +5,14 @@ Repository ini berisi materi dan kode implementasi hands-on untuk memahami konse
 ---
 
 ## 📌 Apa yang Dipelajari?
-- **Protocol Buffers (Protobuf v3)**: Membuat file kontrak `.proto` (`User`, `GetUserRequest`, `UserResponse`, `ListUsersRequest`, `CreateUserRequest`, `CreateUsersSummary`).
-- **Compiler `protoc`**: Melakukan generate otomatis struct Go dan interface RPC dari schema proto.
-- **Unary RPC (`GetUser`)**: 1 request masuk -> 1 response keluar.
-- **Server Streaming RPC (`ListUsers`)**: 1 request masuk -> server mengalirkan data satu per satu ke client.
-- **Client Streaming RPC (`CreateUsers`)**: Client mengalirkan banyak data ke server -> server membalas 1 ringkasan (*summary*).
-- **gRPC Server & Client**: Mengimplementasikan service dan menghubungkan client via HTTP/2.
-- **Error Handling**: Menangani kode error terstandar gRPC (`codes.NotFound`).
+Lengkap dengan **4 Pola Komunikasi Utama gRPC**:
+1. **Unary RPC (`GetUser`)**: 1 request masuk -> 1 response keluar (mirip REST API biasa).
+2. **Server Streaming RPC (`ListUsers`)**: 1 request masuk -> server mengalirkan data satu per satu ke client.
+3. **Client Streaming RPC (`CreateUsers`)**: Client mengalirkan batch data ke server -> server membalas 1 ringkasan (*summary*).
+4. **Bidirectional Streaming RPC (`UserChat`)**: Client dan server saling bertukar stream data secara bersamaan (*full-duplex real-time*).
+- **Protocol Buffers (Protobuf v3)**: Kontrak data terstruktur yang dikompilasi dengan `protoc`.
+- **gRPC Server & Client**: Arsitektur jaringan berbasis HTTP/2 di Go.
+- **Error Handling**: Kode error terstandar gRPC (`codes.NotFound`).
 
 ---
 

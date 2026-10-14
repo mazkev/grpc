@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package user;
+
+// Lokasi package Go hasil generate kode nanti:
+// "grpc-learning/gen/user" adalah import path-nya
+// "userpb" adalah nama alias package di kode Go
+option go_package = "grpc-learning/gen/user;userpb";
+
+// 1. Model Data: merepresentasikan data User
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+}
+
+// 2. Request: apa yang perlu dikirim client saat memanggil GetUser
+message GetUserRequest {
+  string id = 1;
+}
+
+// 3. Response: apa yang akan dikembalikan oleh server
+message UserResponse {
+  User user = 1;
+}
+
+// 4. Service: kumpulan fungsi (RPC) yang disediakan oleh server
+service UserService {
+  // Unary RPC: 1 request masuk -> 1 response keluar
+  rpc GetUser(GetUserRequest) returns (UserResponse);
+}

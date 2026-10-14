@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_GetUser_FullMethodName   = "/user.UserService/GetUser"
-	UserService_ListUsers_FullMethodName = "/user.UserService/ListUsers"
+	UserService_GetUser_FullMethodName     = "/user.UserService/GetUser"
+	UserService_ListUsers_FullMethodName   = "/user.UserService/ListUsers"
+	UserService_CreateUsers_FullMethodName = "/user.UserService/CreateUsers"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -34,6 +35,9 @@ type UserServiceClient interface {
 	// Server Streaming RPC: 1 request masuk -> banyak stream response keluar
 	// Perhatikan kata kunci 'stream' di depan tipe balasan!
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[UserResponse], error)
+	// Client Streaming RPC: banyak stream request masuk -> 1 summary response keluar
+	// Perhatikan kata kunci 'stream' di depan parameter input!
+	CreateUsers(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[CreateUserRequest, CreateUsersSummary], error)
 }
 
 type userServiceClient struct {
@@ -73,6 +77,19 @@ func (c *userServiceClient) ListUsers(ctx context.Context, in *ListUsersRequest,
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type UserService_ListUsersClient = grpc.ServerStreamingClient[UserResponse]
 
+func (c *userServiceClient) CreateUsers(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[CreateUserRequest, CreateUsersSummary], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &UserService_ServiceDesc.Streams[1], UserService_CreateUsers_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[CreateUserRequest, CreateUsersSummary]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type UserService_CreateUsersClient = grpc.ClientStreamingClient[CreateUserRequest, CreateUsersSummary]
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -84,6 +101,9 @@ type UserServiceServer interface {
 	// Server Streaming RPC: 1 request masuk -> banyak stream response keluar
 	// Perhatikan kata kunci 'stream' di depan tipe balasan!
 	ListUsers(*ListUsersRequest, grpc.ServerStreamingServer[UserResponse]) error
+	// Client Streaming RPC: banyak stream request masuk -> 1 summary response keluar
+	// Perhatikan kata kunci 'stream' di depan parameter input!
+	CreateUsers(grpc.ClientStreamingServer[CreateUserRequest, CreateUsersSummary]) error
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -99,6 +119,9 @@ func (UnimplementedUserServiceServer) GetUser(context.Context, *GetUserRequest) 
 }
 func (UnimplementedUserServiceServer) ListUsers(*ListUsersRequest, grpc.ServerStreamingServer[UserResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method ListUsers not implemented")
+}
+func (UnimplementedUserServiceServer) CreateUsers(grpc.ClientStreamingServer[CreateUserRequest, CreateUsersSummary]) error {
+	return status.Errorf(codes.Unimplemented, "method CreateUsers not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -150,6 +173,13 @@ func _UserService_ListUsers_Handler(srv interface{}, stream grpc.ServerStream) e
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type UserService_ListUsersServer = grpc.ServerStreamingServer[UserResponse]
 
+func _UserService_CreateUsers_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(UserServiceServer).CreateUsers(&grpc.GenericServerStream[CreateUserRequest, CreateUsersSummary]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type UserService_CreateUsersServer = grpc.ClientStreamingServer[CreateUserRequest, CreateUsersSummary]
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -167,6 +197,11 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "ListUsers",
 			Handler:       _UserService_ListUsers_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "CreateUsers",
+			Handler:       _UserService_CreateUsers_Handler,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "proto/user/user.proto",

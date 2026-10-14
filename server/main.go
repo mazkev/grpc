@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	// Import hasil generate dari folder gen/user
@@ -20,13 +22,16 @@ type userServer struct {
 	// UnimplementedUserServiceServer wajib di-embed untuk forward compatibility
 	userpb.UnimplementedUserServiceServer
 
+	mu  sync.RWMutex
+	seq int
 	// Dummy database di memori untuk keperluan belajar
-	db map[string]*userpb.User
+	db  map[string]*userpb.User
 }
 
 // Fungsi pembantu untuk membuat server dengan data awal
 func newUserServer() *userServer {
 	return &userServer{
+		seq: 2,
 		db: map[string]*userpb.User{
 			"usr-1": {
 				Id:    "usr-1",
@@ -75,6 +80,44 @@ func (s *userServer) ListUsers(req *userpb.ListUsersRequest, stream grpc.ServerS
 
 	log.Println("[Server] Selesai mengirim seluruh stream user.")
 	return nil
+}
+
+// 4. Client Streaming: Menerima banyak stream user dari client, lalu membalas 1 ringkasan
+func (s *userServer) CreateUsers(stream grpc.ClientStreamingServer[userpb.CreateUserRequest, userpb.CreateUsersSummary]) error {
+	log.Println("[Server] Memulai menerima stream CreateUsers dari client...")
+	var createdIDs []string
+
+	for {
+		// Terima data dari stream client
+		req, err := stream.Recv()
+		if err == io.EOF {
+			// Sinyal EOF dari client: client sudah selesai mengirim
+			log.Printf("[Server] Client selesai streaming. Total dibuat: %d user.", len(createdIDs))
+			// Server mengirim balasan ringkasan tunggal dan menutup stream
+			return stream.SendAndClose(&userpb.CreateUsersSummary{
+				TotalCreated: int32(len(createdIDs)),
+				Ids:          createdIDs,
+			})
+		}
+		if err != nil {
+			return err
+		}
+
+		// Simpan user baru ke database
+		s.mu.Lock()
+		s.seq++
+		newID := fmt.Sprintf("usr-%d", s.seq)
+		newUser := &userpb.User{
+			Id:    newID,
+			Name:  req.GetName(),
+			Email: req.GetEmail(),
+		}
+		s.db[newID] = newUser
+		s.mu.Unlock()
+
+		createdIDs = append(createdIDs, newID)
+		log.Printf("[Server] [Stream In] Menerima & membuat user: %s (%s)", newUser.GetName(), newID)
+	}
 }
 
 

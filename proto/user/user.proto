@@ -27,6 +27,18 @@ message UserResponse {
 // Request untuk Server Streaming: meminta semua daftar user
 message ListUsersRequest {}
 
+// Request untuk Client Streaming: 1 item data user yang dikirim client dalam rangkaian stream
+message CreateUserRequest {
+  string name = 1;
+  string email = 2;
+}
+
+// Response untuk Client Streaming: ringkasan (summary) hasil create user
+message CreateUsersSummary {
+  int32 total_created = 1;
+  repeated string ids = 2; // 'repeated' mirip slice/array di Go
+}
+
 // 4. Service: kumpulan fungsi (RPC) yang disediakan oleh server
 service UserService {
   // Unary RPC: 1 request masuk -> 1 response keluar
@@ -35,5 +47,10 @@ service UserService {
   // Server Streaming RPC: 1 request masuk -> banyak stream response keluar
   // Perhatikan kata kunci 'stream' di depan tipe balasan!
   rpc ListUsers(ListUsersRequest) returns (stream UserResponse);
+
+  // Client Streaming RPC: banyak stream request masuk -> 1 summary response keluar
+  // Perhatikan kata kunci 'stream' di depan parameter input!
+  rpc CreateUsers(stream CreateUserRequest) returns (CreateUsersSummary);
 }
+
 

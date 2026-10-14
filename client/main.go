@@ -109,6 +109,44 @@ func main() {
 		fmt.Printf("   📥 [Item %d Masuk] %s (%s) - Email: %s\n", itemCount, u.GetName(), u.GetId(), u.GetEmail())
 	}
 
+	// =========================================================
+	// TEST KASUS 4: CLIENT STREAMING (CreateUsers)
+	// =========================================================
+	fmt.Println("\n▶️ [Kasus 4] Client Streaming: Mengirim batch data user (CreateUsers)")
+
+	ctxClientStream, cancelClientStream := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelClientStream()
+
+	// Inisialisasi stream pengiriman dari client ke server
+	uploadStream, err := client.CreateUsers(ctxClientStream)
+	if err != nil {
+		log.Fatalf("Gagal membuka stream CreateUsers: %v", err)
+	}
+
+	newUsersToUpload := []*userpb.CreateUserRequest{
+		{Name: "Dewi Lestari", Email: "dewi@example.com"},
+		{Name: "Eko Kurniawan", Email: "eko@example.com"},
+		{Name: "Fajar Nugraha", Email: "fajar@example.com"},
+	}
+
+	for i, u := range newUsersToUpload {
+		fmt.Printf("   📤 [Mengirim %d/%d] %s (%s)...\n", i+1, len(newUsersToUpload), u.GetName(), u.GetEmail())
+		if err := uploadStream.Send(u); err != nil {
+			log.Fatalf("Gagal mengirim item stream: %v", err)
+		}
+		time.Sleep(500 * time.Millisecond) // Jeda simulasi proses upload bertahap
+	}
+
+	// Tutup stream pengiriman dan tunggu response summary dari server
+	summary, err := uploadStream.CloseAndRecv()
+	if err != nil {
+		log.Fatalf("Gagal menerima summary dari server: %v", err)
+	}
+
+	fmt.Println("✅ [Client] Response Summary diterima dari server!")
+	fmt.Printf("   • Total User Berhasil Dibuat: %d\n", summary.GetTotalCreated())
+	fmt.Printf("   • Daftar ID yang Diberikan  : %v\n", summary.GetIds())
+
 	fmt.Println("\n=====================================================")
 	fmt.Println("🎉 Pengujian Client Selesai dengan Sukses!")
 	fmt.Println("=====================================================")

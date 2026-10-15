@@ -26,3 +26,9 @@ Contoh dasar gRPC di Go tanpa database, tanpa streaming, dan tanpa logika rumit.
    ```powershell
    go run ./client/main.go
    ```
+
+---
+
+## 📖 Dokumentasi Pendukung
+- [CHEATSHEET.md](CHEATSHEET.md) - Kamus praktis memahami Pointer, Struct, Method, dan Istilah gRPC untuk pemula.
+

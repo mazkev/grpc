@@ -2,9 +2,10 @@ syntax = "proto3";
 
 package product;
 
+// 1. Lokasi di mana kode Go hasil generate akan diletakkan nanti
 option go_package = "grpc-learning/gen/product;productpb";
 
-// 1. Data Model Produk
+// 2. Definisi Model Data Produk
 message Product {
   string id = 1;
   string name = 2;
@@ -12,17 +13,17 @@ message Product {
   int32 stock = 4;
 }
 
-// 2. Request: Client mengirim ID produk yang ingin dicari
+// 3. Format Request: apa yang wajib dikirim client saat ingin mencari produk
 message GetProductRequest {
   string id = 1;
 }
 
-// 3. Response: Server mengembalikan data produk yang ditemukan
+// 4. Format Response: apa yang dijanjikan server untuk dikembalikan
 message GetProductResponse {
   Product product = 1;
 }
 
-// 4. Service: Definisi fungsi remote yang disediakan server
+// 5. Daftar Service / Fungsi Remote yang disepakati
 service ProductService {
   rpc GetProduct (GetProductRequest) returns (GetProductResponse);
 }

@@ -17,4 +17,6 @@ message HelloResponse {
 // Service: mendefinisikan fungsi yang bisa dipanggil
 service Greeter {
   rpc SayHello (HelloRequest) returns (HelloResponse);
+  rpc SayGoodbye (HelloRequest) returns (HelloResponse);
 }
+

@@ -26,6 +26,17 @@ func (s *server) SayHello(ctx context.Context, req *hellopb.HelloRequest) (*hell
 	}, nil
 }
 
+// Logika fungsi SayGoodbye: menerima nama, membalas salam perpisahan
+func (s *server) SayGoodbye(ctx context.Context, req *hellopb.HelloRequest) (*hellopb.HelloResponse, error) {
+	name := req.GetName()
+	reply := fmt.Sprintf("Goodbye, %s! Sampai jumpa lagi.", name)
+
+	return &hellopb.HelloResponse{
+		Message: reply,
+	}, nil
+}
+
+
 func main() {
 	// 1. Listen port TCP
 	lis, err := net.Listen("tcp", ":50051")

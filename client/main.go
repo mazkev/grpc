@@ -31,6 +31,14 @@ func main() {
 		log.Fatalf("could not greet: %v", err)
 	}
 
-	// 4. Cetak hasil
-	log.Printf("Response dari server: %s", resp.GetMessage())
+	// 4. Cetak hasil SayHello
+	log.Printf("[SayHello] Response: %s", resp.GetMessage())
+
+	// 5. Panggil fungsi baru: SayGoodbye
+	goodbyeResp, err := client.SayGoodbye(ctx, &hellopb.HelloRequest{Name: "Kevin"})
+	if err != nil {
+		log.Fatalf("could not say goodbye: %v", err)
+	}
+	log.Printf("[SayGoodbye] Response: %s", goodbyeResp.GetMessage())
 }
+

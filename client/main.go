@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	hellopb "grpc-learning/gen/hello"
+	productpb "grpc-learning/gen/product"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -13,68 +13,45 @@ import (
 )
 
 func main() {
-	// 1. Konek ke server
+	// 1. Hubungkan ke server
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("Gagal terhubung ke server: %v", err)
 	}
 	defer conn.Close()
 
 	// 2. Buat client stub
-	client := hellopb.NewGreeterClient(conn)
+	client := productpb.NewProductServiceClient(conn)
 
-	// 3. Panggil fungsi SayHello
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	resp, err := client.SayHello(ctx, &hellopb.HelloRequest{Name: "Kevin"})
+	// -------------------------------------------------------------
+	// Uji Coba 1: Mencari Produk yang ADA ("p-01")
+	// -------------------------------------------------------------
+	log.Println("🔍 Mencari produk dengan ID: 'p-01'...")
+	resp, err := client.GetProduct(ctx, &productpb.GetProductRequest{Id: "p-01"})
 	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+		log.Fatalf("Gagal mengambil produk: %v", err)
 	}
 
-	// 4. Cetak hasil SayHello
-	log.Printf("[SayHello] Response: %s", resp.GetMessage())
+	prod := resp.GetProduct()
+	log.Printf("✅ Produk Ditemukan!")
+	log.Printf("   • Nama  : %s", prod.GetName())
+	log.Printf("   • Harga : Rp %.2f", prod.GetPrice())
+	log.Printf("   • Stok  : %d unit", prod.GetStock())
 
-	// 5. Panggil fungsi SayGoodbye
-	goodbyeResp, err := client.SayGoodbye(ctx, &hellopb.HelloRequest{Name: "Kevin"})
-	if err != nil {
-		log.Fatalf("could not say goodbye: %v", err)
-	}
-	log.Printf("[SayGoodbye] Response: %s", goodbyeResp.GetMessage())
-
-	// 6. Panggil fungsi baru: Add (Penjumlahan)
-	angka1 := int32(15)
-	angka2 := int32(25)
-	addResp, err := client.Add(ctx, &hellopb.AddRequest{A: angka1, B: angka2})
-	if err != nil {
-		log.Fatalf("could not add: %v", err)
-	}
-	log.Printf("[Add] Hasil penjumlahan %d + %d = %d", angka1, angka2, addResp.GetResult())
-
-	// 7. Panggil fungsi Divide (Kasus Normal: 100 / 4)
-	divResp, err := client.Divide(ctx, &hellopb.DivideRequest{A: 100.0, B: 4.0})
-	if err != nil {
-		log.Fatalf("could not divide: %v", err)
-	}
-	log.Printf("[Divide Normal] 100.0 / 4.0 = %.2f", divResp.GetResult())
-
-	// 8. Panggil fungsi Divide (Kasus Error: 100 / 0)
-	_, errDivZero := client.Divide(ctx, &hellopb.DivideRequest{A: 100.0, B: 0.0})
-	if errDivZero != nil {
-		st, ok := status.FromError(errDivZero)
+	// -------------------------------------------------------------
+	// Uji Coba 2: Mencari Produk yang TIDAK ADA ("p-999")
+	// -------------------------------------------------------------
+	log.Println("\n🔍 Mencari produk dengan ID yang tidak ada: 'p-999'...")
+	_, errNotFound := client.GetProduct(ctx, &productpb.GetProductRequest{Id: "p-999"})
+	if errNotFound != nil {
+		st, ok := status.FromError(errNotFound)
 		if ok {
-			log.Printf("[Divide Error Terdeteksi] Code: %s | Pesan: %s", st.Code(), st.Message())
+			log.Printf("⚠️ Server merespons dengan error terstruktur:")
+			log.Printf("   • Kode  : %s", st.Code())
+			log.Printf("   • Pesan : %s", st.Message())
 		}
 	}
-
-	// 9. Panggil fungsi SumAll (Mengirim Slice/Array Angka)
-	daftarAngka := []int32{10, 20, 30, 40}
-	sumResp, err := client.SumAll(ctx, &hellopb.SumAllRequest{Numbers: daftarAngka})
-	if err != nil {
-		log.Fatalf("could not sum all: %v", err)
-	}
-	log.Printf("[SumAll] Menjumlahkan %v -> Total = %d (dari %d angka)", daftarAngka, sumResp.GetTotal(), sumResp.GetCount())
 }
-
-
-

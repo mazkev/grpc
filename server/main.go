@@ -2,95 +2,69 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 
-	hellopb "grpc-learning/gen/hello"
+	productpb "grpc-learning/gen/product"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// Server mengimplementasikan interface GreeterServer dari protobuf
 type server struct {
-	hellopb.UnimplementedGreeterServer
+	productpb.UnimplementedProductServiceServer
+
+	// Katalog produk tersimpan di memori
+	products map[string]*productpb.Product
 }
 
-// Logika fungsi SayHello: menerima nama, membalas salam
-func (s *server) SayHello(ctx context.Context, req *hellopb.HelloRequest) (*hellopb.HelloResponse, error) {
-	name := req.GetName()
-	reply := fmt.Sprintf("Hello, %s!", name)
-
-	return &hellopb.HelloResponse{
-		Message: reply,
-	}, nil
-}
-
-// Logika fungsi SayGoodbye: menerima nama, membalas salam perpisahan
-func (s *server) SayGoodbye(ctx context.Context, req *hellopb.HelloRequest) (*hellopb.HelloResponse, error) {
-	name := req.GetName()
-	reply := fmt.Sprintf("Goodbye, %s! Sampai jumpa lagi.", name)
-
-	return &hellopb.HelloResponse{
-		Message: reply,
-	}, nil
-}
-
-// Logika fungsi Add: menjumlahkan dua angka dari client
-func (s *server) Add(ctx context.Context, req *hellopb.AddRequest) (*hellopb.AddResponse, error) {
-	hasil := req.GetA() + req.GetB()
-	return &hellopb.AddResponse{
-		Result: hasil,
-	}, nil
-}
-
-// Logika fungsi Divide: membagi a dengan b (validasi jika b == 0)
-func (s *server) Divide(ctx context.Context, req *hellopb.DivideRequest) (*hellopb.DivideResponse, error) {
-	if req.GetB() == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "angka pembagi (b) tidak boleh nol!")
+func newServer() *server {
+	return &server{
+		products: map[string]*productpb.Product{
+			"p-01": {
+				Id:    "p-01",
+				Name:  "Kopi Robusta Lampung",
+				Price: 25000.0,
+				Stock: 50,
+			},
+			"p-02": {
+				Id:    "p-02",
+				Name:  "Teh Hijau Celup",
+				Price: 15000.0,
+				Stock: 25,
+			},
+		},
 	}
-	hasil := req.GetA() / req.GetB()
-	return &hellopb.DivideResponse{
-		Result: hasil,
-	}, nil
 }
 
-// Logika fungsi SumAll: menjumlahkan seluruh angka di dalam slice/array
-func (s *server) SumAll(ctx context.Context, req *hellopb.SumAllRequest) (*hellopb.SumAllResponse, error) {
-	numbers := req.GetNumbers()
-	total := int32(0)
-	for _, num := range numbers {
-		total += num
+// Implementasi GetProduct sesuai kontrak di product.proto
+func (s *server) GetProduct(ctx context.Context, req *productpb.GetProductRequest) (*productpb.GetProductResponse, error) {
+	productID := req.GetId()
+	log.Printf("[Server] Menerima pencarian produk ID: %s", productID)
+
+	p, exists := s.products[productID]
+	if !exists {
+		// Jika produk tidak ditemukan, kembalikan error NotFound
+		return nil, status.Errorf(codes.NotFound, "Produk dengan ID '%s' tidak ditemukan", productID)
 	}
-	return &hellopb.SumAllResponse{
-		Total: total,
-		Count: int32(len(numbers)),
+
+	return &productpb.GetProductResponse{
+		Product: p,
 	}, nil
 }
-
-
-
-
 
 func main() {
-	// 1. Listen port TCP
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("Gagal membuka port: %v", err)
 	}
 
-	// 2. Buat gRPC server
 	s := grpc.NewServer()
+	productpb.RegisterProductServiceServer(s, newServer())
 
-	// 3. Register service
-	hellopb.RegisterGreeterServer(s, &server{})
-
-	log.Println("Server gRPC berjalan di port :50051...")
-
-	// 4. Jalankan
+	log.Println("🛒 Product Service (gRPC Server) berjalan di port :50051...")
 	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatalf("Gagal menjalankan server: %v", err)
 	}
 }

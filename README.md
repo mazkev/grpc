@@ -1,18 +1,18 @@
-# 🚀 gRPC Hello World (Contoh Paling Sederhana)
+# 🛒 Katalog Produk (Product Service gRPC)
 
-Contoh dasar gRPC di Go tanpa database, tanpa streaming, dan tanpa logika rumit.
+Contoh gRPC sederhana untuk backend Katalog Produk di Go.
 
 ## Struktur Project
 ```text
 .
 ├── proto/
-│   └── hello.proto    # Kontrak service & pesan
+│   └── product.proto    # Kontrak service & model Product
 ├── gen/
-│   └── hello/         # Hasil generate protoc
+│   └── product/         # Hasil generate protoc
 ├── server/
-│   └── main.go        # Server gRPC (:50051)
+│   └── main.go          # gRPC Server Katalog Produk (:50051)
 └── client/
-    └── main.go        # Client gRPC pemanggil
+    └── main.go          # Client pemanggil (Cari produk & error handling)
 ```
 
 ## Cara Menjalankan
@@ -30,5 +30,4 @@ Contoh dasar gRPC di Go tanpa database, tanpa streaming, dan tanpa logika rumit.
 ---
 
 ## 📖 Dokumentasi Pendukung
-- [CHEATSHEET.md](CHEATSHEET.md) - Kamus praktis memahami Pointer, Struct, Method, dan Istilah gRPC untuk pemula.
-
+- [CHEATSHEET.md](CHEATSHEET.md) - Kamus istilah Go & gRPC untuk pemula.

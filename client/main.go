@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -49,6 +50,22 @@ func main() {
 		log.Fatalf("could not add: %v", err)
 	}
 	log.Printf("[Add] Hasil penjumlahan %d + %d = %d", angka1, angka2, addResp.GetResult())
+
+	// 7. Panggil fungsi Divide (Kasus Normal: 100 / 4)
+	divResp, err := client.Divide(ctx, &hellopb.DivideRequest{A: 100.0, B: 4.0})
+	if err != nil {
+		log.Fatalf("could not divide: %v", err)
+	}
+	log.Printf("[Divide Normal] 100.0 / 4.0 = %.2f", divResp.GetResult())
+
+	// 8. Panggil fungsi Divide (Kasus Error: 100 / 0)
+	_, errDivZero := client.Divide(ctx, &hellopb.DivideRequest{A: 100.0, B: 0.0})
+	if errDivZero != nil {
+		st, ok := status.FromError(errDivZero)
+		if ok {
+			log.Printf("[Divide Error Terdeteksi] Code: %s | Pesan: %s", st.Code(), st.Message())
+		}
+	}
 }
 
 

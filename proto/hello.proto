@@ -25,13 +25,28 @@ message AddResponse {
   int32 result = 1;
 }
 
+// Request untuk operasi pembagian (menggunakan tipe desimal double)
+message DivideRequest {
+  double a = 1;
+  double b = 2;
+}
+
+// Response hasil pembagian
+message DivideResponse {
+  double result = 1;
+}
+
 // Service: mendefinisikan fungsi yang bisa dipanggil
 service Greeter {
   rpc SayHello (HelloRequest) returns (HelloResponse);
   rpc SayGoodbye (HelloRequest) returns (HelloResponse);
   
-  // Fungsi matematika baru: menerima 2 angka, mengembalikan hasil jumlah
+  // Fungsi matematika: menerima 2 angka, mengembalikan hasil jumlah
   rpc Add (AddRequest) returns (AddResponse);
+
+  // Fungsi pembagian: memvalidasi agar b tidak boleh nol
+  rpc Divide (DivideRequest) returns (DivideResponse);
 }
+
 
 

@@ -22,6 +22,7 @@ const (
 	Greeter_SayHello_FullMethodName   = "/hello.Greeter/SayHello"
 	Greeter_SayGoodbye_FullMethodName = "/hello.Greeter/SayGoodbye"
 	Greeter_Add_FullMethodName        = "/hello.Greeter/Add"
+	Greeter_Divide_FullMethodName     = "/hello.Greeter/Divide"
 )
 
 // GreeterClient is the client API for Greeter service.
@@ -32,8 +33,10 @@ const (
 type GreeterClient interface {
 	SayHello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
 	SayGoodbye(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
-	// Fungsi matematika baru: menerima 2 angka, mengembalikan hasil jumlah
+	// Fungsi matematika: menerima 2 angka, mengembalikan hasil jumlah
 	Add(ctx context.Context, in *AddRequest, opts ...grpc.CallOption) (*AddResponse, error)
+	// Fungsi pembagian: memvalidasi agar b tidak boleh nol
+	Divide(ctx context.Context, in *DivideRequest, opts ...grpc.CallOption) (*DivideResponse, error)
 }
 
 type greeterClient struct {
@@ -74,6 +77,16 @@ func (c *greeterClient) Add(ctx context.Context, in *AddRequest, opts ...grpc.Ca
 	return out, nil
 }
 
+func (c *greeterClient) Divide(ctx context.Context, in *DivideRequest, opts ...grpc.CallOption) (*DivideResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DivideResponse)
+	err := c.cc.Invoke(ctx, Greeter_Divide_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GreeterServer is the server API for Greeter service.
 // All implementations must embed UnimplementedGreeterServer
 // for forward compatibility.
@@ -82,8 +95,10 @@ func (c *greeterClient) Add(ctx context.Context, in *AddRequest, opts ...grpc.Ca
 type GreeterServer interface {
 	SayHello(context.Context, *HelloRequest) (*HelloResponse, error)
 	SayGoodbye(context.Context, *HelloRequest) (*HelloResponse, error)
-	// Fungsi matematika baru: menerima 2 angka, mengembalikan hasil jumlah
+	// Fungsi matematika: menerima 2 angka, mengembalikan hasil jumlah
 	Add(context.Context, *AddRequest) (*AddResponse, error)
+	// Fungsi pembagian: memvalidasi agar b tidak boleh nol
+	Divide(context.Context, *DivideRequest) (*DivideResponse, error)
 	mustEmbedUnimplementedGreeterServer()
 }
 
@@ -102,6 +117,9 @@ func (UnimplementedGreeterServer) SayGoodbye(context.Context, *HelloRequest) (*H
 }
 func (UnimplementedGreeterServer) Add(context.Context, *AddRequest) (*AddResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Add not implemented")
+}
+func (UnimplementedGreeterServer) Divide(context.Context, *DivideRequest) (*DivideResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Divide not implemented")
 }
 func (UnimplementedGreeterServer) mustEmbedUnimplementedGreeterServer() {}
 func (UnimplementedGreeterServer) testEmbeddedByValue()                 {}
@@ -178,6 +196,24 @@ func _Greeter_Add_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Greeter_Divide_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DivideRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GreeterServer).Divide(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Greeter_Divide_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GreeterServer).Divide(ctx, req.(*DivideRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Greeter_ServiceDesc is the grpc.ServiceDesc for Greeter service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -196,6 +232,10 @@ var Greeter_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Add",
 			Handler:    _Greeter_Add_Handler,
+		},
+		{
+			MethodName: "Divide",
+			Handler:    _Greeter_Divide_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

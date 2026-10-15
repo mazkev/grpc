@@ -9,6 +9,8 @@ import (
 	hellopb "grpc-learning/gen/hello"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Server mengimplementasikan interface GreeterServer dari protobuf
@@ -43,6 +45,18 @@ func (s *server) Add(ctx context.Context, req *hellopb.AddRequest) (*hellopb.Add
 		Result: hasil,
 	}, nil
 }
+
+// Logika fungsi Divide: membagi a dengan b (validasi jika b == 0)
+func (s *server) Divide(ctx context.Context, req *hellopb.DivideRequest) (*hellopb.DivideResponse, error) {
+	if req.GetB() == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "angka pembagi (b) tidak boleh nol!")
+	}
+	hasil := req.GetA() / req.GetB()
+	return &hellopb.DivideResponse{
+		Result: hasil,
+	}, nil
+}
+
 
 
 

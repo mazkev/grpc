@@ -23,6 +23,7 @@ const (
 	Greeter_SayGoodbye_FullMethodName = "/hello.Greeter/SayGoodbye"
 	Greeter_Add_FullMethodName        = "/hello.Greeter/Add"
 	Greeter_Divide_FullMethodName     = "/hello.Greeter/Divide"
+	Greeter_SumAll_FullMethodName     = "/hello.Greeter/SumAll"
 )
 
 // GreeterClient is the client API for Greeter service.
@@ -37,6 +38,8 @@ type GreeterClient interface {
 	Add(ctx context.Context, in *AddRequest, opts ...grpc.CallOption) (*AddResponse, error)
 	// Fungsi pembagian: memvalidasi agar b tidak boleh nol
 	Divide(ctx context.Context, in *DivideRequest, opts ...grpc.CallOption) (*DivideResponse, error)
+	// Fungsi penjumlahan array: menjumlahkan banyak angka dari slice
+	SumAll(ctx context.Context, in *SumAllRequest, opts ...grpc.CallOption) (*SumAllResponse, error)
 }
 
 type greeterClient struct {
@@ -87,6 +90,16 @@ func (c *greeterClient) Divide(ctx context.Context, in *DivideRequest, opts ...g
 	return out, nil
 }
 
+func (c *greeterClient) SumAll(ctx context.Context, in *SumAllRequest, opts ...grpc.CallOption) (*SumAllResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SumAllResponse)
+	err := c.cc.Invoke(ctx, Greeter_SumAll_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GreeterServer is the server API for Greeter service.
 // All implementations must embed UnimplementedGreeterServer
 // for forward compatibility.
@@ -99,6 +112,8 @@ type GreeterServer interface {
 	Add(context.Context, *AddRequest) (*AddResponse, error)
 	// Fungsi pembagian: memvalidasi agar b tidak boleh nol
 	Divide(context.Context, *DivideRequest) (*DivideResponse, error)
+	// Fungsi penjumlahan array: menjumlahkan banyak angka dari slice
+	SumAll(context.Context, *SumAllRequest) (*SumAllResponse, error)
 	mustEmbedUnimplementedGreeterServer()
 }
 
@@ -120,6 +135,9 @@ func (UnimplementedGreeterServer) Add(context.Context, *AddRequest) (*AddRespons
 }
 func (UnimplementedGreeterServer) Divide(context.Context, *DivideRequest) (*DivideResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Divide not implemented")
+}
+func (UnimplementedGreeterServer) SumAll(context.Context, *SumAllRequest) (*SumAllResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SumAll not implemented")
 }
 func (UnimplementedGreeterServer) mustEmbedUnimplementedGreeterServer() {}
 func (UnimplementedGreeterServer) testEmbeddedByValue()                 {}
@@ -214,6 +232,24 @@ func _Greeter_Divide_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Greeter_SumAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SumAllRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GreeterServer).SumAll(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Greeter_SumAll_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GreeterServer).SumAll(ctx, req.(*SumAllRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Greeter_ServiceDesc is the grpc.ServiceDesc for Greeter service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -236,6 +272,10 @@ var Greeter_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Divide",
 			Handler:    _Greeter_Divide_Handler,
+		},
+		{
+			MethodName: "SumAll",
+			Handler:    _Greeter_SumAll_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

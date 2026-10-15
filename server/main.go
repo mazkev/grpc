@@ -57,6 +57,20 @@ func (s *server) Divide(ctx context.Context, req *hellopb.DivideRequest) (*hello
 	}, nil
 }
 
+// Logika fungsi SumAll: menjumlahkan seluruh angka di dalam slice/array
+func (s *server) SumAll(ctx context.Context, req *hellopb.SumAllRequest) (*hellopb.SumAllResponse, error) {
+	numbers := req.GetNumbers()
+	total := int32(0)
+	for _, num := range numbers {
+		total += num
+	}
+	return &hellopb.SumAllResponse{
+		Total: total,
+		Count: int32(len(numbers)),
+	}, nil
+}
+
+
 
 
 

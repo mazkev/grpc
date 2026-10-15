@@ -36,6 +36,17 @@ message DivideResponse {
   double result = 1;
 }
 
+// Request untuk menjumlahkan deretan angka (array/slice di Protobuf pakai 'repeated')
+message SumAllRequest {
+  repeated int32 numbers = 1;
+}
+
+// Response hasil penjumlahan deretan angka
+message SumAllResponse {
+  int32 total = 1;
+  int32 count = 2; // Berapa banyak angka yang dijumlahkan
+}
+
 // Service: mendefinisikan fungsi yang bisa dipanggil
 service Greeter {
   rpc SayHello (HelloRequest) returns (HelloResponse);
@@ -46,7 +57,11 @@ service Greeter {
 
   // Fungsi pembagian: memvalidasi agar b tidak boleh nol
   rpc Divide (DivideRequest) returns (DivideResponse);
+
+  // Fungsi penjumlahan array: menjumlahkan banyak angka dari slice
+  rpc SumAll (SumAllRequest) returns (SumAllResponse);
 }
+
 
 
 

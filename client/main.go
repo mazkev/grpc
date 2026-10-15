@@ -66,6 +66,15 @@ func main() {
 			log.Printf("[Divide Error Terdeteksi] Code: %s | Pesan: %s", st.Code(), st.Message())
 		}
 	}
+
+	// 9. Panggil fungsi SumAll (Mengirim Slice/Array Angka)
+	daftarAngka := []int32{10, 20, 30, 40}
+	sumResp, err := client.SumAll(ctx, &hellopb.SumAllRequest{Numbers: daftarAngka})
+	if err != nil {
+		log.Fatalf("could not sum all: %v", err)
+	}
+	log.Printf("[SumAll] Menjumlahkan %v -> Total = %d (dari %d angka)", daftarAngka, sumResp.GetTotal(), sumResp.GetCount())
 }
+
 
 

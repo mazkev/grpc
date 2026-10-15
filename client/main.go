@@ -34,11 +34,21 @@ func main() {
 	// 4. Cetak hasil SayHello
 	log.Printf("[SayHello] Response: %s", resp.GetMessage())
 
-	// 5. Panggil fungsi baru: SayGoodbye
+	// 5. Panggil fungsi SayGoodbye
 	goodbyeResp, err := client.SayGoodbye(ctx, &hellopb.HelloRequest{Name: "Kevin"})
 	if err != nil {
 		log.Fatalf("could not say goodbye: %v", err)
 	}
 	log.Printf("[SayGoodbye] Response: %s", goodbyeResp.GetMessage())
+
+	// 6. Panggil fungsi baru: Add (Penjumlahan)
+	angka1 := int32(15)
+	angka2 := int32(25)
+	addResp, err := client.Add(ctx, &hellopb.AddRequest{A: angka1, B: angka2})
+	if err != nil {
+		log.Fatalf("could not add: %v", err)
+	}
+	log.Printf("[Add] Hasil penjumlahan %d + %d = %d", angka1, angka2, addResp.GetResult())
 }
+
 

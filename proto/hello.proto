@@ -14,9 +14,24 @@ message HelloResponse {
   string message = 1;
 }
 
+// Request untuk operasi matematika penjumlahan
+message AddRequest {
+  int32 a = 1;
+  int32 b = 2;
+}
+
+// Response hasil penjumlahan
+message AddResponse {
+  int32 result = 1;
+}
+
 // Service: mendefinisikan fungsi yang bisa dipanggil
 service Greeter {
   rpc SayHello (HelloRequest) returns (HelloResponse);
   rpc SayGoodbye (HelloRequest) returns (HelloResponse);
+  
+  // Fungsi matematika baru: menerima 2 angka, mengembalikan hasil jumlah
+  rpc Add (AddRequest) returns (AddResponse);
 }
+
 

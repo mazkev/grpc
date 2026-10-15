@@ -36,6 +36,15 @@ func (s *server) SayGoodbye(ctx context.Context, req *hellopb.HelloRequest) (*he
 	}, nil
 }
 
+// Logika fungsi Add: menjumlahkan dua angka dari client
+func (s *server) Add(ctx context.Context, req *hellopb.AddRequest) (*hellopb.AddResponse, error) {
+	hasil := req.GetA() + req.GetB()
+	return &hellopb.AddResponse{
+		Result: hasil,
+	}, nil
+}
+
+
 
 func main() {
 	// 1. Listen port TCP

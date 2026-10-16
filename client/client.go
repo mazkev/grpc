@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"time"
 
@@ -19,19 +20,57 @@ func main() {
 	}
 	defer conn.Close()
 
-	// 2. Buat Client
 	client := productpb.NewProductServiceClient(conn)
 
-	// 3. Panggil GetProduct
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	// 2. Buka jalur streaming 2 arah
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := client.GetProduct(ctx, &productpb.GetProductRequest{Id: "prod-101"})
+	stream, err := client.LiveChat(ctx)
 	if err != nil {
-		log.Fatalf("Gagal memanggil GetProduct: %v", err)
+		log.Fatalf("Gagal buka stream chat: %v", err)
 	}
 
-	// 4. Cetak balasan dari server
-	p := resp.GetProduct()
-	log.Printf("✅ Berhasil dapat produk: %s (Harga: Rp %.2f, Stok: %d)", p.GetName(), p.GetPrice(), p.GetStock())
+	// 3. Goroutine Background: Mendengarkan balasan server
+	waitChannel := make(chan struct{})
+	go func() {
+		for {
+			resp, err := stream.Recv()
+			if err == io.EOF {
+				close(waitChannel)
+				return
+			}
+			if err != nil {
+				log.Printf("Error saat menerima: %v", err)
+				close(waitChannel)
+				return
+			}
+			log.Printf("💬 [Gudang Balas]: %s", resp.GetReply())
+		}
+	}()
+
+	// 4. Jalur Utama: Mengirim pesan dari Kasir ke Gudang
+	daftarChat := []string{
+		"Halo Gudang, apakah barang P-01 siap?",
+		"Tolong dicek segera ya!",
+		"Oke, tolong langsung dikemas!",
+	}
+
+	for _, teks := range daftarChat {
+		log.Printf("📤 [Kasus Kirim]: %s", teks)
+		err := stream.Send(&productpb.ChatMessage{
+			Sender: "Kasir-01",
+			Text:   teks,
+		})
+		if err != nil {
+			log.Fatalf("Gagal kirim pesan: %v", err)
+		}
+		time.Sleep(600 * time.Millisecond) // Jeda simulasi obrolan
+	}
+
+	// 5. Tutup jalur pengiriman client dan tunggu sampai balasan selesai diterima
+	stream.CloseSend()
+	<-waitChannel
+
+	log.Println("🏁 Sesi obrolan dua arah selesai!")
 }

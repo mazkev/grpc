@@ -1,6 +1,8 @@
 # 🛒 Katalog Produk (Product Service gRPC)
 
-Contoh gRPC sederhana untuk backend Katalog Produk di Go.
+Contoh gRPC sederhana untuk backend Katalog Produk di Go, mencakup:
+- **Unary RPC (`GetProduct`)**: Permintaan 1 data produk.
+- **Bidirectional Streaming (`LiveChat`)**: Obrolan real-time dua arah antara Kasir (Client) dan Gudang (Server) dalam 1 koneksi gRPC.
 
 ## Struktur Project
 ```text

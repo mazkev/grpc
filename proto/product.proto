@@ -23,7 +23,21 @@ message GetProductResponse {
   Product product = 1;
 }
 
-// 5. Daftar Service / Fungsi Remote yang disepakati
+
+// Pesan dari client
+message ChatMessage {
+  string sender = 1;
+  string text = 2;
+}
+
+// Balasan dari server
+message ChatResponse {
+  string reply = 1;
+}
+
 service ProductService {
   rpc GetProduct (GetProductRequest) returns (GetProductResponse);
+
+  // Fitur Streaming Dua Arah:
+  rpc LiveChat (stream ChatMessage) returns (stream ChatResponse);
 }

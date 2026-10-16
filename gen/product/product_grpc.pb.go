@@ -20,15 +20,16 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ProductService_GetProduct_FullMethodName = "/product.ProductService/GetProduct"
+	ProductService_LiveChat_FullMethodName   = "/product.ProductService/LiveChat"
 )
 
 // ProductServiceClient is the client API for ProductService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-//
-// 5. Daftar Service / Fungsi Remote yang disepakati
 type ProductServiceClient interface {
 	GetProduct(ctx context.Context, in *GetProductRequest, opts ...grpc.CallOption) (*GetProductResponse, error)
+	// Fitur Streaming Dua Arah:
+	LiveChat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChatMessage, ChatResponse], error)
 }
 
 type productServiceClient struct {
@@ -49,13 +50,26 @@ func (c *productServiceClient) GetProduct(ctx context.Context, in *GetProductReq
 	return out, nil
 }
 
+func (c *productServiceClient) LiveChat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChatMessage, ChatResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ProductService_ServiceDesc.Streams[0], ProductService_LiveChat_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ChatMessage, ChatResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ProductService_LiveChatClient = grpc.BidiStreamingClient[ChatMessage, ChatResponse]
+
 // ProductServiceServer is the server API for ProductService service.
 // All implementations must embed UnimplementedProductServiceServer
 // for forward compatibility.
-//
-// 5. Daftar Service / Fungsi Remote yang disepakati
 type ProductServiceServer interface {
 	GetProduct(context.Context, *GetProductRequest) (*GetProductResponse, error)
+	// Fitur Streaming Dua Arah:
+	LiveChat(grpc.BidiStreamingServer[ChatMessage, ChatResponse]) error
 	mustEmbedUnimplementedProductServiceServer()
 }
 
@@ -68,6 +82,9 @@ type UnimplementedProductServiceServer struct{}
 
 func (UnimplementedProductServiceServer) GetProduct(context.Context, *GetProductRequest) (*GetProductResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProduct not implemented")
+}
+func (UnimplementedProductServiceServer) LiveChat(grpc.BidiStreamingServer[ChatMessage, ChatResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method LiveChat not implemented")
 }
 func (UnimplementedProductServiceServer) mustEmbedUnimplementedProductServiceServer() {}
 func (UnimplementedProductServiceServer) testEmbeddedByValue()                        {}
@@ -108,6 +125,13 @@ func _ProductService_GetProduct_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductService_LiveChat_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ProductServiceServer).LiveChat(&grpc.GenericServerStream[ChatMessage, ChatResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ProductService_LiveChatServer = grpc.BidiStreamingServer[ChatMessage, ChatResponse]
+
 // ProductService_ServiceDesc is the grpc.ServiceDesc for ProductService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -120,6 +144,13 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ProductService_GetProduct_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "LiveChat",
+			Handler:       _ProductService_LiveChat_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "proto/product.proto",
 }

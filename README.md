@@ -12,8 +12,7 @@ Contoh gRPC sederhana untuk backend Katalog Produk di Go.
 ├── server/
 │   └── main.go          # gRPC Server Katalog Produk (:50051)
 └── client/
-    └── main.go          # Client pemanggil (Cari produk & error handling)
-```
+    └── client.go        # Client pemanggil gRPC
 
 ## Cara Menjalankan
 
@@ -24,7 +23,7 @@ Contoh gRPC sederhana untuk backend Katalog Produk di Go.
 
 2. **Terminal 2 (Jalankan Client):**
    ```powershell
-   go run ./client/main.go
+   go run ./client/client.go
    ```
 
 ---

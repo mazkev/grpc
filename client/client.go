@@ -87,9 +87,15 @@ func main() {
 		}
 	}
 
+	// Cek jika ada error pembacaan scanner dari terminal
+	if err := scanner.Err(); err != nil {
+		log.Printf("Error membaca input: %v", err)
+	}
+
 	// 5. Tutup jalur pengiriman client dan tunggu sampai selesai
 	stream.CloseSend()
 	<-waitChannel
+
 
 	fmt.Println("🏁 Sesi obrolan selesai. Sampai jumpa!")
 }

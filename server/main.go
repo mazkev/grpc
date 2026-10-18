@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"os"
 
 	"google.golang.org/grpc"
 
@@ -16,31 +18,62 @@ type server struct {
 }
 
 func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage, productpb.ChatResponse]) error {
-    log.Println("Sesi LiveChat dimulai!")
+	fmt.Println("==================================================")
+	fmt.Println("💬 SESI CHAT GUDANG DENGAN KASIR DIMULAI!")
+	fmt.Println("   Ketik balasan Anda lalu tekan [ENTER]")
+	fmt.Println("==================================================")
 
-    for {
-        // 1. DENGARKAN pesan yang masuk dari Client
-        msg, err := stream.Recv()
-        if err == io.EOF {
-            // io.EOF artinya: Client sudah selesai bicara dan menutup stream
-            log.Println("Client menutup obrolan.")
-            return nil
-        }
-        if err != nil {
-            return err
-        }
+	done := make(chan struct{})
 
-        log.Printf("[Gudang Menerima] Dari '%s': %s", msg.GetSender(), msg.GetText())
+	// 1. Goroutine Background: Terus mendengarkan pesan masuk dari Client
+	go func() {
+		for {
+			msg, err := stream.Recv()
+			if err == io.EOF {
+				fmt.Println("\n[Info] Kasir telah menutup obrolan.")
+				close(done)
+				return
+			}
+			if err != nil {
+				log.Printf("Error saat menerima pesan client: %v", err)
+				close(done)
+				return
+			}
+			// Tampilkan pesan Kasir di layar Server
+			fmt.Printf("\n📩 [Kasir]: %s\nAnda (Gudang) > ", msg.GetText())
+		}
+	}()
 
-        // 2. BALAS langsung ke Client lewat stream yang sama
-        balasan := fmt.Sprintf("Halo %s, gudang menerima pesanmu: '%s'", msg.GetSender(), msg.GetText())
-        err = stream.Send(&productpb.ChatResponse{Reply: balasan})
-        if err != nil {
-            return err
-        }
-    }
+	// 2. Jalur Utama: Membaca ketikan keyboard manusia di terminal Server
+	scanner := bufio.NewScanner(os.Stdin)
+	for {
+		select {
+		case <-done:
+			return nil
+		default:
+			fmt.Print("Anda (Gudang) > ")
+			if !scanner.Scan() {
+				if err := scanner.Err(); err != nil {
+					return err
+				}
+				return nil
+			}
+
+			pesanBalasan := scanner.Text()
+			if pesanBalasan == "" {
+				continue
+			}
+
+			// Kirim balasan manual ke Client lewat gRPC stream
+			err := stream.Send(&productpb.ChatResponse{
+				Reply: pesanBalasan,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
-
 
 func main() {
 	lis, err := net.Listen("tcp", ":50051")

@@ -82,7 +82,33 @@ func main() {
 	}
 	fmt.Println("--------------------------------------------------")
 
-	// 5. Buka jalur streaming 2 arah (LiveChat)
+	// 5. Uji Coba Protobuf Lanjutan: Memanggil ListProducts (repeated & enum)
+	fmt.Println("\n📦 [Katalog Produk] Meminta daftar semua produk dari Gudang...")
+	listCtx, cancelList := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancelList()
+
+	listResp, err := client.ListProducts(listCtx, &productpb.ListProductsRequest{
+		FilterCategory: productpb.Category_CATEGORY_UNSPECIFIED, // Tampilkan semua kategori
+	})
+	if err != nil {
+		log.Printf("❌ Gagal mengambil katalog: %v", err)
+	} else {
+		fmt.Println("--------------------------------------------------------------------------")
+		fmt.Printf("%-5s | %-26s | %-13s | %-13s | %-5s\n", "ID", "NAMA BARANG", "KATEGORI", "HARGA", "STOK")
+		fmt.Println("--------------------------------------------------------------------------")
+		for _, p := range listResp.GetProducts() {
+			fmt.Printf("%-5s | %-26s | %-13s | Rp %-10.0f | %-5d\n",
+				p.GetId(),
+				p.GetName(),
+				p.GetCategory().String(),
+				p.GetPrice(),
+				p.GetStock(),
+			)
+		}
+		fmt.Println("--------------------------------------------------------------------------")
+	}
+
+	// 6. Buka jalur streaming 2 arah (LiveChat)
 	// Perhatikan: Kita cukup memakai context.Background() polos!
 	// Tidak perlu lagi repot nulis metadata manual, karena sudah diurus oleh Client Interceptor.
 	ctx := context.Background()

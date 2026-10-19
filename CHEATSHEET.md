@@ -23,6 +23,8 @@ Catatan praktis untuk memahami istilah-istilah inti dalam ekosistem Go dan gRPC 
 |---|---|---|
 | **File `.proto`** | Surat perjanjian / kontrak resmi antara pemanggil dan penyedia service. | [proto/hello.proto](file:///d:/prog/grpc/proto/hello.proto) |
 | **`protoc`** | Mesin compiler yang membaca file `.proto` lalu otomatis menghasilkan kode Go di folder `gen/`. | `protoc --go_out=. ...` |
+| **`repeated`** | Tipe data List / Array di Protobuf (menjadi slice `[]*Product` di Go). | `repeated Product products = 1;` |
+| **`enum`** | Daftar pilihan opsi tetap bernomor (wajib ada nilai default bernilai 0). | `enum Category { UNSPECIFIED = 0; FOOD = 1; }` |
 | **Unary RPC** | Pola standar: Client kirim 1 request $\rightarrow$ Server balas 1 response. | Fungsi `SayHello` |
 | **Streaming RPC** | Pola data mengalir bertahap (bisa dari Server, dari Client, atau dua arah bolak-balik). | Chat, realtime sync, download file besar |
 | **Metadata** | Wadah data ekstra (mirip HTTP Headers) untuk mengirim token, session ID, atau info auth via `context`. | `metadata.AppendToOutgoingContext(...)` |

@@ -5,24 +5,42 @@ package product;
 // 1. Lokasi di mana kode Go hasil generate akan diletakkan nanti
 option go_package = "grpc-learning/gen/product;productpb";
 
-// 2. Definisi Model Data Produk
+// 2. Definisi Kategori Produk (Enum)
+enum Category {
+  CATEGORY_UNSPECIFIED = 0;
+  ELECTRONICS = 1;
+  FOOD = 2;
+  FASHION = 3;
+}
+
+// 3. Definisi Model Data Produk
 message Product {
   string id = 1;
   string name = 2;
   double price = 3;
   int32 stock = 4;
+  Category category = 5;
 }
 
-// 3. Format Request: apa yang wajib dikirim client saat ingin mencari produk
+// 4. Format Request: apa yang wajib dikirim client saat ingin mencari 1 produk
 message GetProductRequest {
   string id = 1;
 }
 
-// 4. Format Response: apa yang dijanjikan server untuk dikembalikan
+// 5. Format Response: apa yang dijanjikan server untuk dikembalikan
 message GetProductResponse {
   Product product = 1;
 }
 
+// 6. Request untuk melihat katalog banyak produk
+message ListProductsRequest {
+  Category filter_category = 1; // Jika 0 (UNSPECIFIED), kembalikan semua barang
+}
+
+// 7. Response katalog: menggunakan 'repeated' (List / Slice di Go)
+message ListProductsResponse {
+  repeated Product products = 1;
+}
 
 // Pesan dari client
 message ChatMessage {
@@ -37,6 +55,9 @@ message ChatResponse {
 
 service ProductService {
   rpc GetProduct (GetProductRequest) returns (GetProductResponse);
+
+  // Fitur Baru: Mengambil banyak produk sekaligus
+  rpc ListProducts (ListProductsRequest) returns (ListProductsResponse);
 
   // Fitur Streaming Dua Arah:
   rpc LiveChat (stream ChatMessage) returns (stream ChatResponse);

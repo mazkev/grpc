@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProductService_GetProduct_FullMethodName = "/product.ProductService/GetProduct"
-	ProductService_LiveChat_FullMethodName   = "/product.ProductService/LiveChat"
+	ProductService_GetProduct_FullMethodName   = "/product.ProductService/GetProduct"
+	ProductService_ListProducts_FullMethodName = "/product.ProductService/ListProducts"
+	ProductService_LiveChat_FullMethodName     = "/product.ProductService/LiveChat"
 )
 
 // ProductServiceClient is the client API for ProductService service.
@@ -28,6 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProductServiceClient interface {
 	GetProduct(ctx context.Context, in *GetProductRequest, opts ...grpc.CallOption) (*GetProductResponse, error)
+	// Fitur Baru: Mengambil banyak produk sekaligus
+	ListProducts(ctx context.Context, in *ListProductsRequest, opts ...grpc.CallOption) (*ListProductsResponse, error)
 	// Fitur Streaming Dua Arah:
 	LiveChat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChatMessage, ChatResponse], error)
 }
@@ -44,6 +47,16 @@ func (c *productServiceClient) GetProduct(ctx context.Context, in *GetProductReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetProductResponse)
 	err := c.cc.Invoke(ctx, ProductService_GetProduct_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productServiceClient) ListProducts(ctx context.Context, in *ListProductsRequest, opts ...grpc.CallOption) (*ListProductsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListProductsResponse)
+	err := c.cc.Invoke(ctx, ProductService_ListProducts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +81,8 @@ type ProductService_LiveChatClient = grpc.BidiStreamingClient[ChatMessage, ChatR
 // for forward compatibility.
 type ProductServiceServer interface {
 	GetProduct(context.Context, *GetProductRequest) (*GetProductResponse, error)
+	// Fitur Baru: Mengambil banyak produk sekaligus
+	ListProducts(context.Context, *ListProductsRequest) (*ListProductsResponse, error)
 	// Fitur Streaming Dua Arah:
 	LiveChat(grpc.BidiStreamingServer[ChatMessage, ChatResponse]) error
 	mustEmbedUnimplementedProductServiceServer()
@@ -82,6 +97,9 @@ type UnimplementedProductServiceServer struct{}
 
 func (UnimplementedProductServiceServer) GetProduct(context.Context, *GetProductRequest) (*GetProductResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProduct not implemented")
+}
+func (UnimplementedProductServiceServer) ListProducts(context.Context, *ListProductsRequest) (*ListProductsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListProducts not implemented")
 }
 func (UnimplementedProductServiceServer) LiveChat(grpc.BidiStreamingServer[ChatMessage, ChatResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method LiveChat not implemented")
@@ -125,6 +143,24 @@ func _ProductService_GetProduct_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductService_ListProducts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProductsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).ListProducts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_ListProducts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).ListProducts(ctx, req.(*ListProductsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProductService_LiveChat_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(ProductServiceServer).LiveChat(&grpc.GenericServerStream[ChatMessage, ChatResponse]{ServerStream: stream})
 }
@@ -142,6 +178,10 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetProduct",
 			Handler:    _ProductService_GetProduct_Handler,
+		},
+		{
+			MethodName: "ListProducts",
+			Handler:    _ProductService_ListProducts_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

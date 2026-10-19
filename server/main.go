@@ -22,6 +22,32 @@ type server struct {
 	productpb.UnimplementedProductServiceServer
 }
 
+// Data master produk di memori (Dummy Database)
+var productDB = []*productpb.Product{
+	{Id: "E01", Name: "Laptop Gaming ROG", Price: 25000000, Stock: 5, Category: productpb.Category_ELECTRONICS},
+	{Id: "E02", Name: "Mechanical Keyboard RGB", Price: 1200000, Stock: 15, Category: productpb.Category_ELECTRONICS},
+	{Id: "F01", Name: "Kopi Susu Gula Aren", Price: 18000, Stock: 100, Category: productpb.Category_FOOD},
+	{Id: "F02", Name: "Croissant Cokelat", Price: 25000, Stock: 20, Category: productpb.Category_FOOD},
+	{Id: "C01", Name: "Jaket Hoodie Hitam", Price: 350000, Stock: 12, Category: productpb.Category_FASHION},
+}
+
+// 0. Implementasi Unary RPC: ListProducts (Mendukung repeated & enum)
+func (s *server) ListProducts(ctx context.Context, req *productpb.ListProductsRequest) (*productpb.ListProductsResponse, error) {
+	log.Printf("📋 [Server] Kasir meminta daftar produk (Filter: %v)...", req.GetFilterCategory())
+
+	var hasil []*productpb.Product
+	for _, p := range productDB {
+		// Jika UNSPECIFIED, ambil semua produk. Jika ada filter, ambil yang cocok.
+		if req.GetFilterCategory() == productpb.Category_CATEGORY_UNSPECIFIED || p.Category == req.GetFilterCategory() {
+			hasil = append(hasil, p)
+		}
+	}
+
+	return &productpb.ListProductsResponse{
+		Products: hasil,
+	}, nil
+}
+
 // 0. Implementasi Unary RPC: GetProduct dengan simulasi proses lama (3 detik)
 func (s *server) GetProduct(ctx context.Context, req *productpb.GetProductRequest) (*productpb.GetProductResponse, error) {
 	log.Printf("🔍 [Server] Mencari data produk ID '%s' (estimasi butuh 3 detik)...", req.GetId())
@@ -32,10 +58,11 @@ func (s *server) GetProduct(ctx context.Context, req *productpb.GetProductReques
 		log.Printf("✅ [Server] Produk ID '%s' berhasil ditemukan!", req.GetId())
 		return &productpb.GetProductResponse{
 			Product: &productpb.Product{
-				Id:    req.GetId(),
-				Name:  "Laptop Gaming ROG",
-				Price: 25000000,
-				Stock: 5,
+				Id:       req.GetId(),
+				Name:     "Laptop Gaming ROG",
+				Price:    25000000,
+				Stock:    5,
+				Category: productpb.Category_ELECTRONICS,
 			},
 		}, nil
 

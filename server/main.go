@@ -13,6 +13,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
+	"github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -48,6 +49,9 @@ func (s *server) ListProducts(ctx context.Context, req *productpb.ListProductsRe
 
 	// Lempar event ke RabbitMQ
 	publishEvent("CATALOG_VIEW", "Kasir", fmt.Sprintf("Melihat katalog (Filter: %v)", req.GetFilterCategory()))
+
+	// Alirkan event ke Kafka commit log
+	publishKafkaLog("CATALOG_VIEW", fmt.Sprintf("Kasir melihat katalog (Filter: %v)", req.GetFilterCategory()))
 
 	return &productpb.ListProductsResponse{
 		Products: hasil,
@@ -130,6 +134,44 @@ func publishEvent(event, sender, detail string) {
 	}
 }
 
+// Koneksi Apache Kafka Writer
+var kafkaWriter *kafka.Writer
+
+func initKafka() {
+	kafkaWriter = &kafka.Writer{
+		Addr:     kafka.TCP("localhost:9092"),
+		Topic:    "product-activity",
+		Balancer: &kafka.LeastBytes{},
+	}
+	log.Println("📬 [Kafka] Berhasil menginisialisasi Kafka Writer di localhost:9092 ✅")
+}
+
+// Fungsi helper mengalirkan event ke Kafka topic
+func publishKafkaLog(key, detail string) {
+	if kafkaWriter == nil {
+		return
+	}
+	payload, _ := json.Marshal(map[string]string{
+		"key":       key,
+		"detail":    detail,
+		"timestamp": time.Now().Format("2006-01-02 15:04:05"),
+	})
+
+	go func() {
+		err := kafkaWriter.WriteMessages(context.Background(),
+			kafka.Message{
+				Key:   []byte(key),
+				Value: payload,
+			},
+		)
+		if err != nil {
+			log.Printf("⚠️  [Kafka] Gagal menulis ke Kafka stream: %v", err)
+		} else {
+			log.Printf("📬 [Kafka - Producer] Log dialirkan ke topic 'product-activity' [Key: %s]", key)
+		}
+	}()
+}
+
 // 0. Implementasi Unary RPC: GetProduct dengan Cache-Aside Pattern
 func (s *server) GetProduct(ctx context.Context, req *productpb.GetProductRequest) (*productpb.GetProductResponse, error) {
 	cacheKey := "product:" + req.GetId()
@@ -179,6 +221,9 @@ func (s *server) GetProduct(ctx context.Context, req *productpb.GetProductReques
 
 		// Lempar event ke RabbitMQ
 		publishEvent("PRODUCT_SEARCH", "Kasir", fmt.Sprintf("Menemukan produk '%s' (Rp %.0f)", found.GetName(), found.GetPrice()))
+
+		// Alirkan log ke Kafka
+		publishKafkaLog("PRODUCT_SEARCH", fmt.Sprintf("ID: %s | Nama: %s | Harga: Rp %.0f", found.GetId(), found.GetName(), found.GetPrice()))
 
 		return &productpb.GetProductResponse{Product: found}, nil
 
@@ -267,6 +312,8 @@ func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage,
 			fmt.Printf("\n📩 [Kasir]: %s\nAnda (Gudang) > ", msg.GetText())
 			// Lempar pesan chat ke RabbitMQ agar dicatat worker
 			publishEvent("CHAT_MESSAGE", msg.GetSender(), msg.GetText())
+			// Alirkan ke Kafka stream
+			publishKafkaLog("CHAT_STREAM", fmt.Sprintf("[%s]: %s", msg.GetSender(), msg.GetText()))
 		}
 	}()
 
@@ -307,6 +354,9 @@ func main() {
 
 	// Inisialisasi koneksi RabbitMQ Message Broker
 	initRabbitMQ()
+
+	// Inisialisasi koneksi Apache Kafka Event Stream
+	initKafka()
 
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {

@@ -35,7 +35,8 @@ Catatan praktis untuk memahami istilah-istilah inti dalam ekosistem Go dan gRPC 
 | **`Unimplemented...`** | "Ban serep pengaman" bawaan gRPC yang di-embed ke struct server agar program tidak crash jika ada fungsi baru yang belum sempat kita buat. | `hellopb.UnimplementedGreeterServer` |
 | **Client Stub** | Objek perantara di sisi client untuk memanggil fungsi server seolah-olah fungsi lokal. | `client := hellopb.NewGreeterClient(conn)` |
 | **Redis Cache-Aside** | Pola cek data di Redis dulu (Cache Hit $\rightarrow$ cepat). Jika belum ada (Cache Miss), ambil dari DB lalu simpan ke Redis dengan TTL. | `rdb.Get(ctx, key)`, `rdb.Set(ctx, key, val, ttl)` |
-| **RabbitMQ (Message Broker)** | Pengirim & penampung antrean pesan asinkron (*Event-Driven*) antara gRPC Producer dan Worker Consumer. | `ch.PublishWithContext(...)`, `ch.Consume(...)` |
+| **RabbitMQ (Message Broker)** | Pengirim & penampung antrean pesan asinkron (*Event-Driven*) antara gRPC Producer dan Worker Consumer (Pesan hilang setelah di-ack). | `ch.PublishWithContext(...)`, `ch.Consume(...)` |
+| **Apache Kafka (Event Streaming)** | Buku besar riwayat terdistribusi (*Distributed Commit Log*). Pesan disimpan persisten berdasarkan Topic & Offset, dapat dibaca ulang (*replay*). | `kafka.NewWriter(...)`, `kafka.NewReader(...)` |
 
 ---
 

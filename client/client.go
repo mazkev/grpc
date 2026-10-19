@@ -82,6 +82,37 @@ func main() {
 	}
 	fmt.Println("--------------------------------------------------")
 
+	// 5. Uji Coba Redis Caching (Cache MISS vs Cache HIT)
+	fmt.Println("\n--------------------------------------------------------------------------")
+	fmt.Println("⚡ [Pengujian Redis Caching] Memanggil GetProduct (ID: E01) berturut-turut:")
+
+	// Panggilan 1: Cache MISS (Belum ada di Redis -> Server ambil dari DB butuh 2 detik)
+	fmt.Print("🐢 1. Panggilan Pertama (Belum dicache)... ")
+	t1 := time.Now()
+	ctxGet1, cancelGet1 := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancelGet1()
+	r1, err1 := client.GetProduct(ctxGet1, &productpb.GetProductRequest{Id: "E01"})
+	dur1 := time.Since(t1)
+	if err1 != nil {
+		fmt.Printf("Gagal: %v\n", err1)
+	} else {
+		fmt.Printf("Selesai dalam %v! Data: %s (Rp %.0f)\n", dur1.Round(time.Millisecond), r1.Product.Name, r1.Product.Price)
+	}
+
+	// Panggilan 2: Cache HIT (Sudah disimpan di Redis -> Instan < 5 milidetik!)
+	fmt.Print("⚡ 2. Panggilan Kedua  (Sudah dicache)... ")
+	t2 := time.Now()
+	ctxGet2, cancelGet2 := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancelGet2()
+	r2, err2 := client.GetProduct(ctxGet2, &productpb.GetProductRequest{Id: "E01"})
+	dur2 := time.Since(t2)
+	if err2 != nil {
+		fmt.Printf("Gagal: %v\n", err2)
+	} else {
+		fmt.Printf("Selesai dalam %v! Data: %s (Rp %.0f) 🚀 [INSTAN DARI REDIS]\n", dur2.Round(time.Microsecond), r2.Product.Name, r2.Product.Price)
+	}
+	fmt.Println("--------------------------------------------------------------------------")
+
 	// 5. Uji Coba Protobuf Lanjutan: Memanggil ListProducts (repeated & enum)
 	fmt.Println("\n📦 [Katalog Produk] Meminta daftar semua produk dari Gudang...")
 	listCtx, cancelList := context.WithTimeout(context.Background(), 2*time.Second)

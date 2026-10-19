@@ -34,6 +34,7 @@ Catatan praktis untuk memahami istilah-istilah inti dalam ekosistem Go dan gRPC 
 | **Status Codes** | Kode status resmi gRPC (pengganti HTTP 404, 401, 500) misal `codes.Unauthenticated`, `codes.DeadlineExceeded`. | `status.Errorf(codes.Unauthenticated, ...)` |
 | **`Unimplemented...`** | "Ban serep pengaman" bawaan gRPC yang di-embed ke struct server agar program tidak crash jika ada fungsi baru yang belum sempat kita buat. | `hellopb.UnimplementedGreeterServer` |
 | **Client Stub** | Objek perantara di sisi client untuk memanggil fungsi server seolah-olah fungsi lokal. | `client := hellopb.NewGreeterClient(conn)` |
+| **Redis Cache-Aside** | Pola cek data di Redis dulu (Cache Hit $\rightarrow$ cepat). Jika belum ada (Cache Miss), ambil dari DB lalu simpan ke Redis dengan TTL. | `rdb.Get(ctx, key)`, `rdb.Set(ctx, key, val, ttl)` |
 
 ---
 

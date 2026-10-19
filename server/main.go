@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -48,26 +50,72 @@ func (s *server) ListProducts(ctx context.Context, req *productpb.ListProductsRe
 	}, nil
 }
 
-// 0. Implementasi Unary RPC: GetProduct dengan simulasi proses lama (3 detik)
+// Koneksi Redis Client
+var rdb *redis.Client
+
+func initRedis() {
+	rdb = redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Printf("⚠️  [Redis] Gagal terhubung ke Redis: %v. Berjalan tanpa cache.", err)
+	} else {
+		log.Println("⚡ [Redis] Berhasil terhubung ke Redis di localhost:6379 ✅")
+	}
+}
+
+// 0. Implementasi Unary RPC: GetProduct dengan Cache-Aside Pattern
 func (s *server) GetProduct(ctx context.Context, req *productpb.GetProductRequest) (*productpb.GetProductResponse, error) {
-	log.Printf("🔍 [Server] Mencari data produk ID '%s' (estimasi butuh 3 detik)...", req.GetId())
+	cacheKey := "product:" + req.GetId()
+
+	// 1. Cek ke Redis Cache dulu (Cache Hit)
+	if rdb != nil {
+		cachedData, err := rdb.Get(ctx, cacheKey).Result()
+		if err == nil {
+			var prod productpb.Product
+			if err := json.Unmarshal([]byte(cachedData), &prod); err == nil {
+				log.Printf("⚡ [Server - Cache HIT] Produk ID '%s' diambil dari REDIS (<2ms)! Hemat query DB.", req.GetId())
+				return &productpb.GetProductResponse{Product: &prod}, nil
+			}
+		}
+	}
+
+	// 2. Cache MISS: Produk belum ada di Redis, ambil dari DB (simulasi lambat 2 detik)
+	log.Printf("🐢 [Server - Cache MISS] Produk ID '%s' belum ada di Redis. Mengambil dari DB (butuh 2 detik)...", req.GetId())
 
 	select {
-	case <-time.After(3 * time.Second):
-		// Simulasi: Operasi server berhasil selesai dalam 3 detik
-		log.Printf("✅ [Server] Produk ID '%s' berhasil ditemukan!", req.GetId())
-		return &productpb.GetProductResponse{
-			Product: &productpb.Product{
+	case <-time.After(2 * time.Second):
+		// Cari produk di dummy database
+		var found *productpb.Product
+		for _, p := range productDB {
+			if p.Id == req.GetId() {
+				found = p
+				break
+			}
+		}
+		if found == nil {
+			found = &productpb.Product{
 				Id:       req.GetId(),
 				Name:     "Laptop Gaming ROG",
 				Price:    25000000,
 				Stock:    5,
 				Category: productpb.Category_ELECTRONICS,
-			},
-		}, nil
+			}
+		}
+
+		// 3. Simpan hasil ke Redis Cache (TTL: 60 detik)
+		if rdb != nil {
+			if bytes, err := json.Marshal(found); err == nil {
+				rdb.Set(context.Background(), cacheKey, string(bytes), 60*time.Second)
+				log.Printf("💾 [Server - Cache SAVED] Produk ID '%s' disimpan ke Redis (TTL: 60 detik)", req.GetId())
+			}
+		}
+
+		return &productpb.GetProductResponse{Product: found}, nil
 
 	case <-ctx.Done():
-		// Simulasi: Client tidak sabar / kehabisan waktu (Timeout)
 		log.Printf("⚠️  [Server] Operasi dibatalkan! Client kehabisan waktu: %v", ctx.Err())
 		return nil, status.Errorf(codes.DeadlineExceeded, "pemrosesan terlalu lama, batas waktu habis (timeout)")
 	}
@@ -185,6 +233,9 @@ func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage,
 }
 
 func main() {
+	// Inisialisasi koneksi Redis Caching
+	initRedis()
+
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)

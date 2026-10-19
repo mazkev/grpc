@@ -15,9 +15,43 @@ import (
 	productpb "grpc-learning/gen/product"
 )
 
+// 1. Client Interceptor untuk Streaming (Otomatis menyelipkan token)
+func clientAuthStreamInterceptor(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	cc *grpc.ClientConn,
+	method string,
+	streamer grpc.Streamer,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
+	log.Printf("🚀 [Client Interceptor] Menyelipkan token otomatis untuk panggilan stream: %s", method)
+	// Otomatis tempelkan token ke outgoing context
+	authCtx := metadata.AppendToOutgoingContext(ctx, "authorization", "token-rahasia-123")
+	return streamer(authCtx, desc, cc, method, opts...)
+}
+
+// 2. Client Interceptor untuk Unary (Otomatis menyelipkan token)
+func clientAuthUnaryInterceptor(
+	ctx context.Context,
+	method string,
+	req, reply any,
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption,
+) error {
+	log.Printf("🚀 [Client Interceptor] Menyelipkan token otomatis untuk panggilan unary: %s", method)
+	authCtx := metadata.AppendToOutgoingContext(ctx, "authorization", "token-rahasia-123")
+	return invoker(authCtx, method, req, reply, cc, opts...)
+}
+
 func main() {
-	// 1. Konek ke Server
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// 3. Konek ke Server dengan memasang Client Interceptor
+	conn, err := grpc.NewClient(
+		"localhost:50051",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStreamInterceptor(clientAuthStreamInterceptor),
+		grpc.WithUnaryInterceptor(clientAuthUnaryInterceptor),
+	)
 	if err != nil {
 		log.Fatalf("Gagal konek: %v", err)
 	}
@@ -25,10 +59,10 @@ func main() {
 
 	client := productpb.NewProductServiceClient(conn)
 
-	// 2. Pasang Tiket Rahasia (Metadata) ke dalam Context
-	// Di industri, token ini biasanya didapat setelah proses login (JWT / API Key)
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", "token-rahasia-123")
-
+	// 4. Buka jalur streaming 2 arah
+	// Perhatikan: Kita cukup memakai context.Background() polos!
+	// Tidak perlu lagi repot nulis metadata manual, karena sudah diurus oleh Client Interceptor.
+	ctx := context.Background()
 	stream, err := client.LiveChat(ctx)
 	if err != nil {
 		log.Fatalf("Gagal buka stream chat: %v", err)

@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -45,6 +46,9 @@ func (s *server) ListProducts(ctx context.Context, req *productpb.ListProductsRe
 		}
 	}
 
+	// Lempar event ke RabbitMQ
+	publishEvent("CATALOG_VIEW", "Kasir", fmt.Sprintf("Melihat katalog (Filter: %v)", req.GetFilterCategory()))
+
 	return &productpb.ListProductsResponse{
 		Products: hasil,
 	}, nil
@@ -63,6 +67,66 @@ func initRedis() {
 		log.Printf("⚠️  [Redis] Gagal terhubung ke Redis: %v. Berjalan tanpa cache.", err)
 	} else {
 		log.Println("⚡ [Redis] Berhasil terhubung ke Redis di localhost:6379 ✅")
+	}
+}
+
+// Koneksi RabbitMQ Channel
+var rmqChannel *amqp.Channel
+
+func initRabbitMQ() {
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	if err != nil {
+		log.Printf("⚠️  [RabbitMQ] Gagal terhubung ke RabbitMQ: %v. Berjalan tanpa message broker.", err)
+		return
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Printf("⚠️  [RabbitMQ] Gagal membuka channel: %v", err)
+		return
+	}
+	_, err = ch.QueueDeclare(
+		"event_queue",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Printf("⚠️  [RabbitMQ] Gagal mendeklarasikan antrean: %v", err)
+		return
+	}
+	rmqChannel = ch
+	log.Println("🐇 [RabbitMQ] Berhasil terhubung ke RabbitMQ di localhost:5672 ✅")
+}
+
+// Fungsi helper melempar event pesan ke antrean RabbitMQ
+func publishEvent(event, sender, detail string) {
+	if rmqChannel == nil {
+		return
+	}
+	payload, _ := json.Marshal(map[string]string{
+		"event":     event,
+		"sender":    sender,
+		"detail":    detail,
+		"timestamp": time.Now().Format("15:04:05"),
+	})
+
+	err := rmqChannel.PublishWithContext(
+		context.Background(),
+		"",            // default exchange
+		"event_queue", // nama antrean
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        payload,
+		},
+	)
+	if err != nil {
+		log.Printf("⚠️  [RabbitMQ] Gagal melempar event: %v", err)
+	} else {
+		log.Printf("📢 [RabbitMQ - Producer] Event dilempar ke antrean: [%s] '%s'", event, detail)
 	}
 }
 
@@ -112,6 +176,9 @@ func (s *server) GetProduct(ctx context.Context, req *productpb.GetProductReques
 				log.Printf("💾 [Server - Cache SAVED] Produk ID '%s' disimpan ke Redis (TTL: 60 detik)", req.GetId())
 			}
 		}
+
+		// Lempar event ke RabbitMQ
+		publishEvent("PRODUCT_SEARCH", "Kasir", fmt.Sprintf("Menemukan produk '%s' (Rp %.0f)", found.GetName(), found.GetPrice()))
 
 		return &productpb.GetProductResponse{Product: found}, nil
 
@@ -198,6 +265,8 @@ func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage,
 			}
 			// Tampilkan pesan Kasir di layar Server
 			fmt.Printf("\n📩 [Kasir]: %s\nAnda (Gudang) > ", msg.GetText())
+			// Lempar pesan chat ke RabbitMQ agar dicatat worker
+			publishEvent("CHAT_MESSAGE", msg.GetSender(), msg.GetText())
 		}
 	}()
 
@@ -235,6 +304,9 @@ func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage,
 func main() {
 	// Inisialisasi koneksi Redis Caching
 	initRedis()
+
+	// Inisialisasi koneksi RabbitMQ Message Broker
+	initRabbitMQ()
 
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {

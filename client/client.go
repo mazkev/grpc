@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	productpb "grpc-learning/gen/product"
 )
@@ -24,8 +25,10 @@ func main() {
 
 	client := productpb.NewProductServiceClient(conn)
 
-	// 2. Buka jalur streaming 2 arah (tanpa timeout singkat agar Anda bisa santai mengetik)
-	ctx := context.Background()
+	// 2. Pasang Tiket Rahasia (Metadata) ke dalam Context
+	// Di industri, token ini biasanya didapat setelah proses login (JWT / API Key)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", "token-rahasia-123")
+
 	stream, err := client.LiveChat(ctx)
 	if err != nil {
 		log.Fatalf("Gagal buka stream chat: %v", err)

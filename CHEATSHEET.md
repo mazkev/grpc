@@ -25,6 +25,8 @@ Catatan praktis untuk memahami istilah-istilah inti dalam ekosistem Go dan gRPC 
 | **`protoc`** | Mesin compiler yang membaca file `.proto` lalu otomatis menghasilkan kode Go di folder `gen/`. | `protoc --go_out=. ...` |
 | **Unary RPC** | Pola standar: Client kirim 1 request $\rightarrow$ Server balas 1 response. | Fungsi `SayHello` |
 | **Streaming RPC** | Pola data mengalir bertahap (bisa dari Server, dari Client, atau dua arah bolak-balik). | Chat, realtime sync, download file besar |
+| **Metadata** | Wadah data ekstra (mirip HTTP Headers) untuk mengirim token, session ID, atau info auth via `context`. | `metadata.AppendToOutgoingContext(...)` |
+| **Status Codes** | Kode status resmi gRPC (pengganti HTTP 404, 401, 500) misal `codes.Unauthenticated`, `codes.NotFound`. | `status.Errorf(codes.Unauthenticated, ...)` |
 | **`Unimplemented...`** | "Ban serep pengaman" bawaan gRPC yang di-embed ke struct server agar program tidak crash jika ada fungsi baru yang belum sempat kita buat. | `hellopb.UnimplementedGreeterServer` |
 | **Client Stub** | Objek perantara di sisi client untuk memanggil fungsi server seolah-olah fungsi lokal. | `client := hellopb.NewGreeterClient(conn)` |
 

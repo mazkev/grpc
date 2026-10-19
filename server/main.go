@@ -9,6 +9,9 @@ import (
 	"os"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	productpb "grpc-learning/gen/product"
 )
@@ -18,8 +21,20 @@ type server struct {
 }
 
 func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage, productpb.ChatResponse]) error {
+	// 1. Validasi Token / Metadata (Satpam Pemeriksa Tiket)
+	md, ok := metadata.FromIncomingContext(stream.Context())
+	if !ok {
+		return status.Errorf(codes.Unauthenticated, "akses ditolak: metadata tidak ditemukan")
+	}
+
+	tokens := md.Get("authorization")
+	if len(tokens) == 0 || tokens[0] != "token-rahasia-123" {
+		return status.Errorf(codes.Unauthenticated, "akses ditolak: token salah atau tidak valid")
+	}
+
 	fmt.Println("==================================================")
 	fmt.Println("💬 SESI CHAT GUDANG DENGAN KASIR DIMULAI!")
+	fmt.Println("   [Status]: Kredensial Kasir Terverifikasi ✅")
 	fmt.Println("   Ketik balasan Anda lalu tekan [ENTER]")
 	fmt.Println("==================================================")
 

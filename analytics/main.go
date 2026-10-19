@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -15,11 +16,13 @@ func main() {
 
 	// 1. Inisialisasi Kafka Reader (Consumer)
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  []string{"localhost:9092"},
-		Topic:    "product-activity",
-		GroupID:  "analytics-consumer-group", // Consumer Group ID
-		MinBytes: 10e3,                      // 10KB
-		MaxBytes: 10e6,                      // 10MB
+		Brokers:     []string{"localhost:9092"},
+		Topic:       "product-activity",
+		GroupID:     "analytics-consumer-group-v2", // Group baru agar membaca dari awal
+		StartOffset: kafka.FirstOffset,            // Baca dari awal riwayat (Offset 0)!
+		MinBytes:    1,                            // 1 byte langsung kirim (jangan tunggu buffer 10KB!)
+		MaxBytes:    10e6,                         // 10MB
+		MaxWait:     500 * time.Millisecond,       // Maksimal tunggu setengah detik
 	})
 	defer reader.Close()
 

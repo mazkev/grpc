@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -20,9 +21,9 @@ type server struct {
 	productpb.UnimplementedProductServiceServer
 }
 
-func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage, productpb.ChatResponse]) error {
-	// 1. Validasi Token / Metadata (Satpam Pemeriksa Tiket)
-	md, ok := metadata.FromIncomingContext(stream.Context())
+// 1. Fungsi Mandiri: Memeriksa Token (Satpam Pusat)
+func authorize(ctx context.Context) error {
+	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return status.Errorf(codes.Unauthenticated, "akses ditolak: metadata tidak ditemukan")
 	}
@@ -31,10 +32,51 @@ func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage,
 	if len(tokens) == 0 || tokens[0] != "token-rahasia-123" {
 		return status.Errorf(codes.Unauthenticated, "akses ditolak: token salah atau tidak valid")
 	}
+	return nil
+}
 
+// 2. Interceptor untuk Streaming RPC (seperti LiveChat)
+func authStreamInterceptor(
+	srv any,
+	ss grpc.ServerStream,
+	info *grpc.StreamServerInfo,
+	handler grpc.StreamHandler,
+) error {
+	log.Printf("🛡️  [Lobi Interceptor - Stream] Tamu menuju: %s", info.FullMethod)
+
+	// Periksa tiket di gerbang lobi
+	if err := authorize(ss.Context()); err != nil {
+		log.Printf("❌ [Lobi Interceptor - Stream] Akses ditolak untuk: %s", info.FullMethod)
+		return err
+	}
+
+	log.Printf("✅ [Lobi Interceptor - Stream] Tiket valid! Mempersilakan masuk ke: %s", info.FullMethod)
+	return handler(srv, ss)
+}
+
+// 3. Interceptor untuk Unary RPC (seperti GetProduct)
+func authUnaryInterceptor(
+	ctx context.Context,
+	req any,
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (any, error) {
+	log.Printf("🛡️  [Lobi Interceptor - Unary] Tamu menuju: %s", info.FullMethod)
+
+	if err := authorize(ctx); err != nil {
+		log.Printf("❌ [Lobi Interceptor - Unary] Akses ditolak untuk: %s", info.FullMethod)
+		return nil, err
+	}
+
+	log.Printf("✅ [Lobi Interceptor - Unary] Tiket valid! Mempersilakan masuk ke: %s", info.FullMethod)
+	return handler(ctx, req)
+}
+
+func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage, productpb.ChatResponse]) error {
+	// Catatan: Fungsi ini sekarang BERSIH dari kode validasi token!
+	// Satpam di lobi sudah menjamin hanya client bertiket sah yang bisa sampai ke sini.
 	fmt.Println("==================================================")
 	fmt.Println("💬 SESI CHAT GUDANG DENGAN KASIR DIMULAI!")
-	fmt.Println("   [Status]: Kredensial Kasir Terverifikasi ✅")
 	fmt.Println("   Ketik balasan Anda lalu tekan [ENTER]")
 	fmt.Println("==================================================")
 
@@ -95,7 +137,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	s := grpc.NewServer()
+
+	// 4. Pasang Interceptor saat membuat Server gRPC
+	s := grpc.NewServer(
+		grpc.UnaryInterceptor(authUnaryInterceptor),
+		grpc.StreamInterceptor(authStreamInterceptor),
+	)
 	productpb.RegisterProductServiceServer(s, &server{})
 
 	log.Printf("Server running on port %v", lis.Addr())

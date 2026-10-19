@@ -8,9 +8,13 @@ import (
 	"log"
 	"os"
 
+	"time"
+
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	productpb "grpc-learning/gen/product"
 )
@@ -59,7 +63,26 @@ func main() {
 
 	client := productpb.NewProductServiceClient(conn)
 
-	// 4. Buka jalur streaming 2 arah
+	// 4. Uji Coba Timeout: Kasir mencari barang tapi hanya mau menunggu maksimal 1 detik
+	// (Sementara Server butuh waktu 3 detik untuk memprosesnya)
+	fmt.Println("--------------------------------------------------")
+	fmt.Println("⏱️  [Tes Timeout] Kasir mencari 'LAPTOP-01' (Batas Waktu: 1 Detik)...")
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	prodResp, err := client.GetProduct(timeoutCtx, &productpb.GetProductRequest{Id: "LAPTOP-01"})
+	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.DeadlineExceeded {
+			fmt.Printf("❌ [Kasir] Batalkan tunggu! Waktu habis (Timeout): %s\n", st.Message())
+		} else {
+			fmt.Printf("❌ [Kasir] Gagal mencari produk: %v\n", err)
+		}
+	} else {
+		fmt.Printf("✅ [Kasir] Berhasil menemukan produk: %s (Rp %.0f)\n", prodResp.Product.Name, prodResp.Product.Price)
+	}
+	fmt.Println("--------------------------------------------------")
+
+	// 5. Buka jalur streaming 2 arah (LiveChat)
 	// Perhatikan: Kita cukup memakai context.Background() polos!
 	// Tidak perlu lagi repot nulis metadata manual, karena sudah diurus oleh Client Interceptor.
 	ctx := context.Background()

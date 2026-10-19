@@ -28,7 +28,8 @@ Catatan praktis untuk memahami istilah-istilah inti dalam ekosistem Go dan gRPC 
 | **Metadata** | Wadah data ekstra (mirip HTTP Headers) untuk mengirim token, session ID, atau info auth via `context`. | `metadata.AppendToOutgoingContext(...)` |
 | **Server Interceptor** | Satpam di sisi Server: memeriksa token / catat log sebelum fungsi diproses. | `grpc.UnaryInterceptor`, `grpc.StreamInterceptor` |
 | **Client Interceptor** | Asisten di sisi Client: otomatis menyisipkan token / header ke setiap panggilan RPC. | `grpc.WithUnaryInterceptor`, `grpc.WithStreamInterceptor` |
-| **Status Codes** | Kode status resmi gRPC (pengganti HTTP 404, 401, 500) misal `codes.Unauthenticated`, `codes.NotFound`. | `status.Errorf(codes.Unauthenticated, ...)` |
+| **Deadline / Timeout** | Batas maksimal waktu tunggu panggilan RPC agar aplikasi tidak macet jika jaringan/server lambat. | `context.WithTimeout(ctx, 2*time.Second)` |
+| **Status Codes** | Kode status resmi gRPC (pengganti HTTP 404, 401, 500) misal `codes.Unauthenticated`, `codes.DeadlineExceeded`. | `status.Errorf(codes.Unauthenticated, ...)` |
 | **`Unimplemented...`** | "Ban serep pengaman" bawaan gRPC yang di-embed ke struct server agar program tidak crash jika ada fungsi baru yang belum sempat kita buat. | `hellopb.UnimplementedGreeterServer` |
 | **Client Stub** | Objek perantara di sisi client untuk memanggil fungsi server seolah-olah fungsi lokal. | `client := hellopb.NewGreeterClient(conn)` |
 

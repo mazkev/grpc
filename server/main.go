@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -19,6 +20,30 @@ import (
 
 type server struct {
 	productpb.UnimplementedProductServiceServer
+}
+
+// 0. Implementasi Unary RPC: GetProduct dengan simulasi proses lama (3 detik)
+func (s *server) GetProduct(ctx context.Context, req *productpb.GetProductRequest) (*productpb.GetProductResponse, error) {
+	log.Printf("🔍 [Server] Mencari data produk ID '%s' (estimasi butuh 3 detik)...", req.GetId())
+
+	select {
+	case <-time.After(3 * time.Second):
+		// Simulasi: Operasi server berhasil selesai dalam 3 detik
+		log.Printf("✅ [Server] Produk ID '%s' berhasil ditemukan!", req.GetId())
+		return &productpb.GetProductResponse{
+			Product: &productpb.Product{
+				Id:    req.GetId(),
+				Name:  "Laptop Gaming ROG",
+				Price: 25000000,
+				Stock: 5,
+			},
+		}, nil
+
+	case <-ctx.Done():
+		// Simulasi: Client tidak sabar / kehabisan waktu (Timeout)
+		log.Printf("⚠️  [Server] Operasi dibatalkan! Client kehabisan waktu: %v", ctx.Err())
+		return nil, status.Errorf(codes.DeadlineExceeded, "pemrosesan terlalu lama, batas waktu habis (timeout)")
+	}
 }
 
 // 1. Fungsi Mandiri: Memeriksa Token (Satpam Pusat)

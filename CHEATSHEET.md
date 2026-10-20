@@ -37,6 +37,8 @@ Catatan praktis untuk memahami istilah-istilah inti dalam ekosistem Go dan gRPC 
 | **Redis Cache-Aside** | Pola cek data di Redis dulu (Cache Hit $\rightarrow$ cepat). Jika belum ada (Cache Miss), ambil dari DB lalu simpan ke Redis dengan TTL. | `rdb.Get(ctx, key)`, `rdb.Set(ctx, key, val, ttl)` |
 | **RabbitMQ (Message Broker)** | Pengirim & penampung antrean pesan asinkron (*Event-Driven*) antara gRPC Producer dan Worker Consumer (Pesan hilang setelah di-ack). | `ch.PublishWithContext(...)`, `ch.Consume(...)` |
 | **Apache Kafka (Event Streaming)** | Buku besar riwayat terdistribusi (*Distributed Commit Log*). Pesan disimpan persisten berdasarkan Topic & Offset, dapat dibaca ulang (*replay*). | `kafka.NewWriter(...)`, `kafka.NewReader(...)` |
+| **Prometheus (Metrics Collector)** | Pengumpul metrik berkala (Time-Series) dari server gRPC melalui endpoint HTTP `/metrics`. | `promhttp.Handler()`, `:2112/metrics` |
+| **Grafana (Visualization Dashboard)** | Platform dashboard visual untuk memantau grafik RPS, latensi, dan kesehatan sistem secara real-time. | Port `:3000` (Web UI) |
 
 ---
 

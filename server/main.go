@@ -8,12 +8,15 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -72,6 +75,51 @@ func initRedis() {
 	} else {
 		log.Println("⚡ [Redis] Berhasil terhubung ke Redis di localhost:6379 ✅")
 	}
+}
+
+// ----------------------------------------------------
+// Metrik Prometheus (Observability)
+// ----------------------------------------------------
+var (
+	grpcRequestsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "grpc_requests_total",
+			Help: "Total jumlah pemanggilan RPC yang masuk ke server",
+		},
+		[]string{"method", "status"},
+	)
+	grpcRequestDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "grpc_request_duration_seconds",
+			Help:    "Durasi pemrosesan RPC dalam satuan detik",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method"},
+	)
+	cacheHitsTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "redis_cache_hits_total",
+			Help: "Total cache hit pada Redis",
+		},
+	)
+	cacheMissesTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "redis_cache_misses_total",
+			Help: "Total cache miss pada Redis",
+		},
+	)
+)
+
+func initMetrics() {
+	prometheus.MustRegister(grpcRequestsTotal, grpcRequestDuration, cacheHitsTotal, cacheMissesTotal)
+
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Println("📊 [Prometheus] Endpoint metrik aktif di http://localhost:2112/metrics ✅")
+		if err := http.ListenAndServe(":2112", nil); err != nil {
+			log.Printf("⚠️  [Prometheus] HTTP metrics error: %v", err)
+		}
+	}()
 }
 
 // Koneksi RabbitMQ Channel
@@ -183,12 +231,14 @@ func (s *server) GetProduct(ctx context.Context, req *productpb.GetProductReques
 			var prod productpb.Product
 			if err := json.Unmarshal([]byte(cachedData), &prod); err == nil {
 				log.Printf("⚡ [Server - Cache HIT] Produk ID '%s' diambil dari REDIS (<2ms)! Hemat query DB.", req.GetId())
+				cacheHitsTotal.Inc()
 				return &productpb.GetProductResponse{Product: &prod}, nil
 			}
 		}
 	}
 
 	// 2. Cache MISS: Produk belum ada di Redis, ambil dari DB (simulasi lambat 2 detik)
+	cacheMissesTotal.Inc()
 	log.Printf("🐢 [Server - Cache MISS] Produk ID '%s' belum ada di Redis. Mengambil dari DB (butuh 2 detik)...", req.GetId())
 
 	select {
@@ -259,29 +309,43 @@ func authStreamInterceptor(
 	// Periksa tiket di gerbang lobi
 	if err := authorize(ss.Context()); err != nil {
 		log.Printf("❌ [Lobi Interceptor - Stream] Akses ditolak untuk: %s", info.FullMethod)
+		grpcRequestsTotal.WithLabelValues(info.FullMethod, "UNAUTHENTICATED").Inc()
 		return err
 	}
 
 	log.Printf("✅ [Lobi Interceptor - Stream] Tiket valid! Mempersilakan masuk ke: %s", info.FullMethod)
+	grpcRequestsTotal.WithLabelValues(info.FullMethod, "STREAM_CONNECTED").Inc()
 	return handler(srv, ss)
 }
 
-// 3. Interceptor untuk Unary RPC (seperti GetProduct)
+// 3. Interceptor untuk Unary RPC (seperti GetProduct & ListProducts)
 func authUnaryInterceptor(
 	ctx context.Context,
 	req any,
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
 ) (any, error) {
+	start := time.Now()
 	log.Printf("🛡️  [Lobi Interceptor - Unary] Tamu menuju: %s", info.FullMethod)
 
 	if err := authorize(ctx); err != nil {
 		log.Printf("❌ [Lobi Interceptor - Unary] Akses ditolak untuk: %s", info.FullMethod)
+		grpcRequestsTotal.WithLabelValues(info.FullMethod, "UNAUTHENTICATED").Inc()
 		return nil, err
 	}
 
 	log.Printf("✅ [Lobi Interceptor - Unary] Tiket valid! Mempersilakan masuk ke: %s", info.FullMethod)
-	return handler(ctx, req)
+	resp, err := handler(ctx, req)
+	duration := time.Since(start).Seconds()
+
+	grpcRequestDuration.WithLabelValues(info.FullMethod).Observe(duration)
+	if err != nil {
+		grpcRequestsTotal.WithLabelValues(info.FullMethod, "ERROR").Inc()
+	} else {
+		grpcRequestsTotal.WithLabelValues(info.FullMethod, "OK").Inc()
+	}
+
+	return resp, err
 }
 
 func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage, productpb.ChatResponse]) error {
@@ -357,6 +421,9 @@ func main() {
 
 	// Inisialisasi koneksi Apache Kafka Event Stream
 	initKafka()
+
+	// Inisialisasi Prometheus Metrics Server
+	initMetrics()
 
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {

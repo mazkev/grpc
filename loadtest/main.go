@@ -92,7 +92,8 @@ func printReport(title string, stats LatencyStats) {
 		fmt.Printf("Latensi Terlama (Max) : %v\n", max)
 	}
 	fmt.Println("==========================================================")
-	fmt.Println("💡 Periksa grafik lonjakan realtime di Grafana: http://localhost:3000/d/grpc-overview\n")
+	fmt.Println("💡 Periksa grafik lonjakan realtime di Grafana: http://localhost:3000/d/grpc-overview")
+	fmt.Println()
 }
 
 // 1. Skenario Flash Sale (High Concurrency Cache-Hit)

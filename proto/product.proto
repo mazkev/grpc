@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package product;
+
+option go_package = "grpc-learning/gen/product;productpb";
+
+// 1. Enum Kategori Produk
+enum Category {
+  CATEGORY_UNSPECIFIED = 0;
+  ELECTRONICS = 1;
+  FOOD = 2;
+  FASHION = 3;
+}
+
+// 2. Model Data Produk
+message Product {
+  string id = 1;
+  string name = 2;
+  double price = 3;
+  int32 stock = 4;
+  Category category = 5;
+}
+
+// 3. Request & Response untuk GetProduct (Unary)
+message GetProductRequest {
+  string id = 1;
+}
+
+message GetProductResponse {
+  Product product = 1;
+}
+
+// 4. Request & Response untuk Katalog Produk (List)
+message ListProductsRequest {
+  Category filter_category = 1;
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+}
+
+// 5. Pesan untuk Live Chat (Streaming)
+message ChatMessage {
+  string sender = 1;
+  string text = 2;
+}
+
+message ChatResponse {
+  string reply = 1;
+}
+
+// 6. Service Pintu Layanan gRPC
+service ProductService {
+  // Unary: Ambil 1 produk
+  rpc GetProduct (GetProductRequest) returns (GetProductResponse);
+
+  // Unary: Ambil katalog banyak produk
+  rpc ListProducts (ListProductsRequest) returns (ListProductsResponse);
+
+  // Bidirectional Streaming: Chat Real-time Kasir & Gudang
+  rpc LiveChat (stream ChatMessage) returns (stream ChatResponse);
+}

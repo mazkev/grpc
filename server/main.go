@@ -60,6 +60,30 @@ func (s *server) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb
 	}, nil
 }
 
+// Implementasi Unary RPC: ListProducts (Mendukung repeated & filter enum)
+func (s *server) ListProducts(ctx context.Context, req *pb.ListProductsRequest) (*pb.ListProductsResponse, error) {
+	log.Printf("📋 [Server] Kasir meminta daftar katalog produk (Filter Kategori: %v)...", req.GetFilterCategory())
+
+	var hasil []*pb.Product
+
+	// 1. Lakukan perulangan (looping) pada seluruh database produk kita
+	for _, product := range productDB {
+		// Jika kasir memilih CATEGORY_UNSPECIFIED (0), artinya tampilkan SEMUA produk tanpa filter
+		// Jika kasir memilih kategori tertentu, hanya masukkan produk yang kategorinya cocok
+		if req.GetFilterCategory() == pb.Category_CATEGORY_UNSPECIFIED || product.GetCategory() == req.GetFilterCategory() {
+			hasil = append(hasil, product)
+		}
+	}
+
+	log.Printf("✅ [Server] Mengembalikan %d barang ke kasir", len(hasil))
+
+	// 2. Kembalikan slice 'hasil' ke dalam field 'Products' (repeated)
+	return &pb.ListProductsResponse{
+		Products: hasil,
+	}, nil
+}
+
+
 func main() {
 	// 1. Buka socket TCP di port 50051
 	lis, err := net.Listen("tcp", ":50051")

@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	pb "grpc-learning/gen/product"
+	"io"
 	"log"
 	"net"
+	"os"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -81,6 +85,63 @@ func (s *server) ListProducts(ctx context.Context, req *pb.ListProductsRequest) 
 	return &pb.ListProductsResponse{
 		Products: hasil,
 	}, nil
+}
+
+// Implementasi Bidirectional Streaming RPC: LiveChat
+func (s *server) LiveChat(stream grpc.BidiStreamingServer[pb.ChatMessage, pb.ChatResponse]) error {
+	fmt.Println("\n==================================================")
+	fmt.Println("💬 [Server] SESI CHAT GUDANG DENGAN KASIR DIMULAI!")
+	fmt.Println("   Ketik balasan Anda lalu tekan [ENTER]")
+	fmt.Println("==================================================")
+
+	done := make(chan struct{})
+
+	// 1. Goroutine Background: Terus mendengarkan pesan masuk dari Kasir
+	go func() {
+		for {
+			msg, err := stream.Recv()
+			if err == io.EOF {
+				fmt.Println("\n🚪 [Server] Kasir telah mengakhiri obrolan.")
+				close(done)
+				return
+			}
+			if err != nil {
+				log.Printf("⚠️  [Server] Error menerima pesan kasir: %v", err)
+				close(done)
+				return
+			}
+
+			// Cetak pesan kasir di layar Server
+			fmt.Printf("\n📩 [%s]: %s\nAnda (Gudang) > ", msg.GetSender(), msg.GetText())
+		}
+	}()
+
+	// 2. Loop Utama: Membaca ketikan keyboard operator Gudang di terminal
+	scanner := bufio.NewScanner(os.Stdin)
+	for {
+		select {
+		case <-done:
+			return nil
+		default:
+			fmt.Print("Anda (Gudang) > ")
+			if !scanner.Scan() {
+				return scanner.Err()
+			}
+
+			balasan := scanner.Text()
+			if balasan == "" {
+				continue
+			}
+
+			// Kirim balasan gudang ke Kasir lewat stream
+			err := stream.Send(&pb.ChatResponse{
+				Reply: balasan,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 

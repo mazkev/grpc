@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"time"
 
 	pb "grpc-learning/gen/product"
@@ -67,4 +70,74 @@ func main() {
 	}
 	fmt.Println("--------------------------------------------------------------------------")
 
+
+	// Panggil fungsi live chat di akhir main()
+	runLiveChat(client)
+} // <--- KURUNG KURAWAL TUTUP MAIN() HARUS DI SINI!
+// 8. Fungsi Sesi Live Chat ditaruh di LUAR fungsi main():
+func runLiveChat(client pb.ProductServiceClient) {
+	fmt.Println("\n==================================================")
+	fmt.Println("💬 [Kasir] MEMULAI SESI LIVE CHAT DENGAN GUDANG")
+	fmt.Println("   Ketik 'exit' atau 'keluar' untuk mengakhiri chat")
+	fmt.Println("==================================================")
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Print("Masukkan Nama Anda (Kasir): ")
+	scanner.Scan()
+	namaKasir := scanner.Text()
+	if namaKasir == "" {
+		namaKasir = "Kasir-01"
+	}
+	// Buka koneksi stream dua arah tanpa timeout kaku
+	stream, err := client.LiveChat(context.Background())
+	if err != nil {
+		log.Fatalf("❌ Gagal memulai live chat: %v", err)
+	}
+	done := make(chan struct{})
+	// Goroutine Background: Mendengarkan balasan dari Gudang
+	go func() {
+		for {
+			res, err := stream.Recv()
+			if err == io.EOF {
+				fmt.Println("\n🚪 [Kasir] Gudang telah menutup sesi obrolan.")
+				close(done)
+				return
+			}
+			if err != nil {
+				close(done)
+				return
+			}
+			// Cetak balasan gudang di terminal kasir
+			fmt.Printf("\n📦 [Gudang]: %s\nAnda (%s) > ", res.GetReply(), namaKasir)
+		}
+	}()
+	// Loop Mengetik Pesan Kasir
+	for {
+		fmt.Printf("Anda (%s) > ", namaKasir)
+		if !scanner.Scan() {
+			break
+		}
+		teks := scanner.Text()
+		if teks == "exit" || teks == "keluar" {
+			fmt.Println("👋 Mengakhiri obrolan...")
+			_ = stream.CloseSend() // Tutup saluran kirim kasir secara elegan
+			break
+		}
+		if teks == "" {
+			continue
+		}
+		// Kirim chat ke Gudang lewat stream
+		err := stream.Send(&pb.ChatMessage{
+			Sender: namaKasir,
+			Text:   teks,
+		})
+		if err != nil {
+			log.Printf("❌ Gagal mengirim pesan: %v", err)
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		log.Printf("⚠️  [Kasir] Error input keyboard: %v", err)
+	}
+	<-done // Tunggu sampai sesi benar-benar selesai
 }
+

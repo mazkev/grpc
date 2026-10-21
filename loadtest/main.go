@@ -19,7 +19,7 @@ import (
 
 const (
 	targetAddress = "localhost:50051"
-	apiSecretKey  = "rahasia-super-gudang-2026"
+	apiSecretKey  = "token-rahasia-123"
 )
 
 // clientAuthInterceptor otomatis menyisipkan token ke metadata request
@@ -31,7 +31,7 @@ func clientAuthInterceptor(
 	invoker grpc.UnaryInvoker,
 	opts ...grpc.CallOption,
 ) error {
-	ctx = metadata.AppendToOutgoingContext(ctx, "x-api-key", apiSecretKey)
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", apiSecretKey)
 	return invoker(ctx, method, req, reply, cc, opts...)
 }
 
@@ -43,7 +43,7 @@ func clientStreamAuthInterceptor(
 	streamer grpc.Streamer,
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
-	ctx = metadata.AppendToOutgoingContext(ctx, "x-api-key", apiSecretKey)
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", apiSecretKey)
 	return streamer(ctx, desc, cc, method, opts...)
 }
 

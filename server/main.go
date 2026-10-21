@@ -108,10 +108,16 @@ var (
 			Help: "Total cache miss pada Redis",
 		},
 	)
+	grpcChatMessagesTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "grpc_chat_messages_total",
+			Help: "Total pesan chat yang dikirim kasir lewat LiveChat stream",
+		},
+	)
 )
 
 func initMetrics() {
-	prometheus.MustRegister(grpcRequestsTotal, grpcRequestDuration, cacheHitsTotal, cacheMissesTotal)
+	prometheus.MustRegister(grpcRequestsTotal, grpcRequestDuration, cacheHitsTotal, cacheMissesTotal, grpcChatMessagesTotal)
 
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
@@ -374,6 +380,8 @@ func (s *server) LiveChat(stream grpc.BidiStreamingServer[productpb.ChatMessage,
 			}
 			// Tampilkan pesan Kasir di layar Server
 			fmt.Printf("\n📩 [Kasir]: %s\nAnda (Gudang) > ", msg.GetText())
+			// Tambahkan hitungan metrik pesan chat Prometheus
+			grpcChatMessagesTotal.Inc()
 			// Lempar pesan chat ke RabbitMQ agar dicatat worker
 			publishEvent("CHAT_MESSAGE", msg.GetSender(), msg.GetText())
 			// Alirkan ke Kafka stream

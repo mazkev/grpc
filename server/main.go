@@ -13,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -65,6 +66,75 @@ func initRedis() {
 	}
 }
 
+// Variabel Saluran RabbitMQ Global
+var rmqChannel *amqp.Channel
+
+// Inisialisasi koneksi ke RabbitMQ
+func initRabbitMQ() {
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	if err != nil {
+		log.Printf("⚠️  [RabbitMQ] Gagal terhubung ke RabbitMQ: %v. Berjalan tanpa message queue.", err)
+		return
+	}
+
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Printf("⚠️  [RabbitMQ] Gagal membuka channel: %v", err)
+		return
+	}
+
+	// Buat/pastikan antrean bernama 'order_queue' sudah ada
+	_, err = ch.QueueDeclare(
+		"order_queue", // Nama antrean
+		true,          // Durable (pesan tidak hilang jika RabbitMQ restart)
+		false,         // Auto-delete
+		false,         // Exclusive
+		false,         // No-wait
+		nil,           // Arguments
+	)
+	if err != nil {
+		log.Printf("⚠️  [RabbitMQ] Gagal deklarasi antrean: %v", err)
+		return
+	}
+
+	rmqChannel = ch
+	log.Println("🐇 [RabbitMQ] Berhasil terhubung ke RabbitMQ di localhost:5672 ✅")
+}
+
+// Fungsi Helper: Melempar tugas cetak invoice ke antrean RabbitMQ
+func publishInvoiceTask(product *pb.Product) {
+	if rmqChannel == nil {
+		return
+	}
+
+	// Bungkus data tugas dalam bentuk JSON
+	payload, _ := json.Marshal(map[string]any{
+		"event":        "CETAK_INVOICE",
+		"product_id":   product.GetId(),
+		"product_name": product.GetName(),
+		"price":        product.GetPrice(),
+		"created_at":   time.Now().Format("15:04:05"),
+	})
+
+	// Lempar pesan ke antrean 'order_queue'
+	err := rmqChannel.PublishWithContext(
+		context.Background(),
+		"",            // Exchange default
+		"order_queue", // Nama antrean tujuan
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        payload,
+		},
+	)
+	if err != nil {
+		log.Printf("⚠️  [RabbitMQ] Gagal melempar tugas invoice: %v", err)
+	} else {
+		log.Printf("📢 [RabbitMQ - Producer] Tugas invoice '%s' berhasil dilempar ke antrean!", product.GetName())
+	}
+}
+
 
 // Struct Server yang Mengimplementasikan Service gRPC
 type server struct {
@@ -108,8 +178,9 @@ func (s *server) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb
 		}
 	}
 
+		// Lempar tugas pembuatan invoice ke antrean RabbitMQ (Asinkron)
+	publishInvoiceTask(product)
 	log.Printf("✅ [Server] Produk '%s' berhasil dikembalikan dari DB", product.GetName())
-
 	return &pb.GetProductResponse{
 		Product: product,
 	}, nil
@@ -257,6 +328,7 @@ func authStreamInterceptor(
 func main() {
 	// 0. Hubungkan ke Redis In-Memory Cache
 	initRedis()
+	initRabbitMQ()
 	// 1. Buka socket TCP di port 50051
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {

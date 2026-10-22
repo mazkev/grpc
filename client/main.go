@@ -111,7 +111,7 @@ conn, err := grpc.NewClient(
 
 
 	// Panggil fungsi live chat di akhir main()
-	//runLiveChat(client)
+	runLiveChat(client)
 } // <--- KURUNG KURAWAL TUTUP MAIN() HARUS DI SINI!
 // 8. Fungsi Sesi Live Chat ditaruh di LUAR fungsi main():
 func runLiveChat(client pb.ProductServiceClient) {

@@ -13,12 +13,50 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
+
+const tokenRahasia = "token-rahasia-123"
+
+// 1. Asisten untuk Unary RPC: Otomatis selipkan token ke context keluar
+func clientAuthUnaryInterceptor(
+	ctx context.Context,
+	method string,
+	req, reply any,
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption,
+) error {
+	// Sisipkan kartu identitas token ke dalam metadata
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", tokenRahasia)
+	return invoker(ctx, method, req, reply, cc, opts...)
+}
+
+// 2. Asisten untuk Streaming RPC: Otomatis selipkan token ke stream keluar
+func clientAuthStreamInterceptor(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	cc *grpc.ClientConn,
+	method string,
+	streamer grpc.Streamer,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", tokenRahasia)
+	return streamer(ctx, desc, cc, method, opts...)
+}
+
 
 func main() {
 	// 1. Hubungkan ke Server gRPC di port 50051
 	// insecure.NewCredentials() digunakan karena di lokal kita belum memakai SSL/TLS sertifikat HTTPS
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Pasang asisten otomatis saat membuka koneksi ke server
+conn, err := grpc.NewClient(
+    "localhost:50051",
+    grpc.WithTransportCredentials(insecure.NewCredentials()),
+    grpc.WithUnaryInterceptor(clientAuthUnaryInterceptor),
+    grpc.WithStreamInterceptor(clientAuthStreamInterceptor),
+)
+
 	if err != nil {
 		log.Fatalf("❌ Gagal terhubung ke server: %v", err)
 	}

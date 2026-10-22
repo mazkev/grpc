@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -144,6 +145,63 @@ func (s *server) LiveChat(stream grpc.BidiStreamingServer[pb.ChatMessage, pb.Cha
 	}
 }
 
+// 1. Fungsi Mandiri: Memeriksa Kartu Akses / Token (Satpam Pusat)
+func authorize(ctx context.Context) error {
+	// Ekstrak metadata dari context yang dikirim tamu
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return status.Errorf(codes.Unauthenticated, "❌ Satpam: Akses ditolak! Tamu tidak membawa kartu identitas (metadata)")
+	}
+
+	// Periksa header 'authorization'
+	tokens := md.Get("authorization")
+	if len(tokens) == 0 || tokens[0] != "token-rahasia-123" {
+		return status.Errorf(codes.Unauthenticated, "❌ Satpam: Akses ditolak! Kartu identitas (token) palsu atau tidak berlaku")
+	}
+
+	return nil // Token sah!
+}
+
+// 2. Satpam untuk Unary RPC (GetProduct & ListProducts)
+func authUnaryInterceptor(
+	ctx context.Context,
+	req any,
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (any, error) {
+	log.Printf("👮‍♂️ [Satpam Unary] Tamu datang hendak menuju ruangan: %s", info.FullMethod)
+
+	// Periksa identitas di lobi
+	if err := authorize(ctx); err != nil {
+		log.Printf("⛔ [Satpam Unary] Mencegat dan mengusir tamu dari: %s", info.FullMethod)
+		return nil, err
+	}
+
+	log.Printf("🟢 [Satpam Unary] Tiket valid! Mempersilakan tamu masuk ke: %s", info.FullMethod)
+	// Persilakan tamu masuk ke fungsi tujuan aslinya
+	return handler(ctx, req)
+}
+
+// 3. Satpam untuk Streaming RPC (LiveChat)
+func authStreamInterceptor(
+	srv any,
+	ss grpc.ServerStream,
+	info *grpc.StreamServerInfo,
+	handler grpc.StreamHandler,
+) error {
+	log.Printf("👮‍♂️ [Satpam Stream] Tamu datang hendak membuka sambungan live: %s", info.FullMethod)
+
+	// Periksa identitas di lobi
+	if err := authorize(ss.Context()); err != nil {
+		log.Printf("⛔ [Satpam Stream] Mencegat dan menolak streaming: %s", info.FullMethod)
+		return err
+	}
+
+	log.Printf("🟢 [Satpam Stream] Tiket valid! Mempersilakan streaming: %s", info.FullMethod)
+	return handler(srv, ss)
+}
+
+
 
 func main() {
 	// 1. Buka socket TCP di port 50051
@@ -152,8 +210,11 @@ func main() {
 		log.Fatalf("❌ Gagal membuka port 50051: %v", err)
 	}
 
-	// 2. Buat instance server gRPC
-	grpcServer := grpc.NewServer()
+	// Pasang kedua satpam di pintu masuk server gRPC
+	grpcServer := grpc.NewServer(
+    grpc.UnaryInterceptor(authUnaryInterceptor),
+    grpc.StreamInterceptor(authStreamInterceptor),
+)
 
 	// 3. Daftarkan service produk kita ke server gRPC
 	pb.RegisterProductServiceServer(grpcServer, &server{})

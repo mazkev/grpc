@@ -56,6 +56,7 @@ conn, err := grpc.NewClient(
     grpc.WithUnaryInterceptor(clientAuthUnaryInterceptor),
     grpc.WithStreamInterceptor(clientAuthStreamInterceptor),
 )
+	
 
 	if err != nil {
 		log.Fatalf("❌ Gagal terhubung ke server: %v", err)
@@ -65,8 +66,8 @@ conn, err := grpc.NewClient(
 	// 2. Buat Client Stub
 	client := pb.NewProductServiceClient(conn)
 
-	// 3. Siapkan context dengan batas waktu (timeout) 2 detik
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		// 3. Siapkan context dengan batas waktu (timeout) 5 detik
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// 4. Panggil RPC GetProduct untuk barang "E01"
@@ -110,7 +111,7 @@ conn, err := grpc.NewClient(
 
 
 	// Panggil fungsi live chat di akhir main()
-	runLiveChat(client)
+	//runLiveChat(client)
 } // <--- KURUNG KURAWAL TUTUP MAIN() HARUS DI SINI!
 // 8. Fungsi Sesi Live Chat ditaruh di LUAR fungsi main():
 func runLiveChat(client pb.ProductServiceClient) {

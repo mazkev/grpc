@@ -3,13 +3,17 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	pb "grpc-learning/gen/product"
 	"io"
+
 	"log"
 	"net"
 	"os"
+	"time"
 
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -41,29 +45,76 @@ var productDB = map[string]*pb.Product{
 	},
 }
 
+// Variabel Client Redis Global
+var rdb *redis.Client
+
+// Inisialisasi koneksi ke Redis Server
+func initRedis() {
+	rdb = redis.NewClient(&redis.Options{
+		Addr: "localhost:6379", // Alamat port default Redis
+	})
+
+	// Uji koneksi dengan PING (batas waktu 2 detik)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Printf("⚠️  [Redis] Gagal terhubung ke Redis: %v. Server tetap berjalan tanpa cache.", err)
+	} else {
+		log.Println("⚡ [Redis] Berhasil terhubung ke Redis di localhost:6379 ✅")
+	}
+}
+
+
 // Struct Server yang Mengimplementasikan Service gRPC
 type server struct {
 	pb.UnimplementedProductServiceServer
 }
 
-// Implementasi Unary RPC: GetProduct
+// Implementasi Unary RPC: GetProduct dengan Cache-Aside Pattern
 func (s *server) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.GetProductResponse, error) {
 	log.Printf("📥 [Server] Kasir mencari produk dengan ID: '%s'", req.GetId())
+	cacheKey := "product:" + req.GetId()
 
-	// 1. Cari produk di database memori kita
+	// 1. LANGKAH PERTAMA: Cek ke Redis Cache dulu (Meja Cepat)
+	if rdb != nil {
+		cachedData, err := rdb.Get(ctx, cacheKey).Result()
+		if err == nil {
+			var prod pb.Product
+			// Bongkar JSON dari Redis menjadi struct Product Go
+			if err := json.Unmarshal([]byte(cachedData), &prod); err == nil {
+				log.Printf("⚡ [Server - Cache HIT] Produk '%s' diambil dari REDIS (<1ms)! Hemat beban DB.", req.GetId())
+				return &pb.GetProductResponse{Product: &prod}, nil
+			}
+		}
+	}
+
+	// 2. LANGKAH KEDUA (Cache MISS): Produk belum ada di Redis, ambil dari DB
+	log.Printf("🐢 [Server - Cache MISS] Produk '%s' belum ada di Redis! Mengambil dari DB (simulasi lambat 2 detik)...", req.GetId())
+	time.Sleep(2 * time.Second) // Simulasi lambat membaca disk database
+
+	// Cari produk di database memori
 	product, found := productDB[req.GetId()]
 	if !found {
-		log.Printf("⚠️  [Server] Produk ID '%s' tidak ditemukan!", req.GetId())
+		log.Printf("⚠️  [Server] Produk ID '%s' tidak ditemukan di DB!", req.GetId())
 		return nil, status.Errorf(codes.NotFound, "produk dengan ID '%s' tidak ditemukan di gudang", req.GetId())
 	}
 
-	log.Printf("✅ [Server] Produk ditemukan: %s (Rp %.0f)", product.GetName(), product.GetPrice())
+	// 3. LANGKAH KETIGA: Simpan fotokopi hasil DB ke Redis (TTL: 60 detik)
+	if rdb != nil {
+		if bytes, err := json.Marshal(product); err == nil {
+			rdb.Set(context.Background(), cacheKey, string(bytes), 60*time.Second)
+			log.Printf("💾 [Server - Cache SAVED] Produk '%s' disimpan ke Redis (TTL: 60 detik)", req.GetId())
+		}
+	}
 
-	// 2. Kembalikan response yang dibungkus struct GetProductResponse
+	log.Printf("✅ [Server] Produk '%s' berhasil dikembalikan dari DB", product.GetName())
+
 	return &pb.GetProductResponse{
 		Product: product,
 	}, nil
 }
+
 
 // Implementasi Unary RPC: ListProducts (Mendukung repeated & filter enum)
 func (s *server) ListProducts(ctx context.Context, req *pb.ListProductsRequest) (*pb.ListProductsResponse, error) {
@@ -204,6 +255,8 @@ func authStreamInterceptor(
 
 
 func main() {
+	// 0. Hubungkan ke Redis In-Memory Cache
+	initRedis()
 	// 1. Buka socket TCP di port 50051
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {

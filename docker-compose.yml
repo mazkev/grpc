@@ -104,6 +104,30 @@ services:
     networks:
       - app-net
 
+  # ==========================================
+  # 7. Core gRPC Microservice Server (Go App)
+  # ==========================================
+  grpc-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: grpc-server:v1
+    container_name: grpc-server
+    restart: unless-stopped
+    ports:
+      - "50051:50051"  # Port gRPC Server
+      - "2112:2112"    # Port Metrik Prometheus
+    environment:
+      REDIS_HOST: "redis-server:6379"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq-server:5672/"
+      KAFKA_BROKER: "kafka-server:29092"
+    depends_on:
+      - redis
+      - rabbitmq
+      - kafka
+    networks:
+      - app-net
+
 networks:
   app-net:
     external: true

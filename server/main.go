@@ -107,8 +107,13 @@ var rdb *redis.Client
 
 // Inisialisasi koneksi ke Redis Server
 func initRedis() {
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "localhost:6379"
+	}
+
 	rdb = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379", // Alamat port default Redis
+		Addr: redisHost,
 	})
 
 	// Uji koneksi dengan PING (batas waktu 2 detik)
@@ -116,20 +121,26 @@ func initRedis() {
 	defer cancel()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Printf("⚠️  [Redis] Gagal terhubung ke Redis: %v. Server tetap berjalan tanpa cache.", err)
+		log.Printf("⚠️  [Redis] Gagal terhubung ke Redis di %s: %v. Server tetap berjalan tanpa cache.", redisHost, err)
 	} else {
-		log.Println("⚡ [Redis] Berhasil terhubung ke Redis di localhost:6379 ✅")
+		log.Printf("⚡ [Redis] Berhasil terhubung ke Redis di %s ✅\n", redisHost)
 	}
 }
+
 
 // Variabel Saluran RabbitMQ Global
 var rmqChannel *amqp.Channel
 
 // Inisialisasi koneksi ke RabbitMQ
 func initRabbitMQ() {
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	rmqURL := os.Getenv("RABBITMQ_URL")
+	if rmqURL == "" {
+		rmqURL = "amqp://guest:guest@localhost:5672/"
+	}
+
+	conn, err := amqp.Dial(rmqURL)
 	if err != nil {
-		log.Printf("⚠️  [RabbitMQ] Gagal terhubung ke RabbitMQ: %v. Berjalan tanpa message queue.", err)
+		log.Printf("⚠️  [RabbitMQ] Gagal terhubung ke RabbitMQ di %s: %v. Berjalan tanpa message queue.", rmqURL, err)
 		return
 	}
 
@@ -154,21 +165,28 @@ func initRabbitMQ() {
 	}
 
 	rmqChannel = ch
-	log.Println("🐇 [RabbitMQ] Berhasil terhubung ke RabbitMQ di localhost:5672 ✅")
+	log.Printf("🐇 [RabbitMQ] Berhasil terhubung ke RabbitMQ di %s ✅\n", rmqURL)
 }
+
 
 // Variabel Kafka Writer Global
 var kafkaWriter *kafka.Writer
 
 // Inisialisasi koneksi Kafka Producer
 func initKafka() {
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
+	if kafkaBroker == "" {
+		kafkaBroker = "localhost:9092"
+	}
+
 	kafkaWriter = &kafka.Writer{
-		Addr:     kafka.TCP("localhost:9092"), // Alamat external port Kafka
-		Topic:    "product-activity",          // Nama Topic buku besar transaksi
+		Addr:     kafka.TCP(kafkaBroker),
+		Topic:    "product-activity", // Nama Topic buku besar transaksi
 		Balancer: &kafka.LeastBytes{},
 	}
-	log.Println("📬 [Kafka] Berhasil menginisialisasi Kafka Writer di localhost:9092 ✅")
+	log.Printf("📬 [Kafka] Berhasil menginisialisasi Kafka Writer di %s ✅\n", kafkaBroker)
 }
+
 
 // Fungsi Helper: Mengalirkan catatan event ke Kafka Commit Log
 func publishKafkaLog(key, detail string) {

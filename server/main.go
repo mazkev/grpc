@@ -10,9 +10,12 @@ import (
 
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
@@ -46,6 +49,58 @@ var productDB = map[string]*pb.Product{
 		Category: pb.Category_FOOD,
 	},
 }
+
+// ----------------------------------------------------
+// Sensor Metrik Prometheus (Observability)
+// ----------------------------------------------------
+var (
+	// Sensor 1: Menghitung total panggilan RPC gRPC (dengan label method & status)
+	grpcRequestsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "grpc_requests_total",
+			Help: "Total jumlah pemanggilan RPC yang masuk ke server",
+		},
+		[]string{"method", "status"},
+	)
+
+	// Sensor 2: Menghitung efektivitas Redis Cache Hit
+	cacheHitsTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "redis_cache_hits_total",
+			Help: "Total cache hit pada Redis",
+		},
+	)
+
+	// Sensor 3: Menghitung saat Redis Cache Miss (butuh baca DB)
+	cacheMissesTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "redis_cache_misses_total",
+			Help: "Total cache miss pada Redis",
+		},
+	)
+
+	// Sensor 4: Menghitung setiap frame pesan chat yang diketik kasir
+	grpcChatMessagesTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "grpc_chat_messages_total",
+			Help: "Total pesan chat yang dikirim kasir lewat LiveChat stream",
+		},
+	)
+)
+
+// Inisialisasi dan hidupkan endpoint HTTP :2112/metrics untuk diserap Prometheus
+func initMetrics() {
+	prometheus.MustRegister(grpcRequestsTotal, cacheHitsTotal, cacheMissesTotal, grpcChatMessagesTotal)
+
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Println("📊 [Prometheus] Endpoint metrik aktif di http://localhost:2112/metrics ✅")
+		if err := http.ListenAndServe(":2112", nil); err != nil {
+			log.Printf("⚠️  [Prometheus] HTTP metrics error: %v", err)
+		}
+	}()
+}
+
 
 // Variabel Client Redis Global
 var rdb *redis.Client
@@ -196,14 +251,17 @@ func (s *server) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb
 			var prod pb.Product
 			// Bongkar JSON dari Redis menjadi struct Product Go
 			if err := json.Unmarshal([]byte(cachedData), &prod); err == nil {
-				log.Printf("⚡ [Server - Cache HIT] Produk '%s' diambil dari REDIS (<1ms)! Hemat beban DB.", req.GetId())
+				log.Printf("⚡ [Server - Cache HIT] ...")
+				cacheHitsTotal.Inc() // Pemicu Sensor Cache Hit (+1)
+
 				return &pb.GetProductResponse{Product: &prod}, nil
 			}
 		}
 	}
 
 	// 2. LANGKAH KEDUA (Cache MISS): Produk belum ada di Redis, ambil dari DB
-	log.Printf("🐢 [Server - Cache MISS] Produk '%s' belum ada di Redis! Mengambil dari DB (simulasi lambat 2 detik)...", req.GetId())
+	log.Printf("🐢 [Server - Cache MISS] ...")
+	cacheMissesTotal.Inc() // Pemicu Sensor Cache Miss (+1)
 	time.Sleep(2 * time.Second) // Simulasi lambat membaca disk database
 
 	// Cari produk di database memori
@@ -280,6 +338,8 @@ func (s *server) LiveChat(stream grpc.BidiStreamingServer[pb.ChatMessage, pb.Cha
 
 			// Cetak pesan kasir di layar Server
 			fmt.Printf("\n📩 [%s]: %s\nAnda (Gudang) > ", msg.GetSender(), msg.GetText())
+			grpcChatMessagesTotal.Inc() // Pemicu Sensor Chat Masuk (+1)
+
 		}
 	}()
 
@@ -339,13 +399,18 @@ func authUnaryInterceptor(
 
 	// Periksa identitas di lobi
 	if err := authorize(ctx); err != nil {
-		log.Printf("⛔ [Satpam Unary] Mencegat dan mengusir tamu dari: %s", info.FullMethod)
-		return nil, err
-	}
+    grpcRequestsTotal.WithLabelValues(info.FullMethod, "UNAUTHENTICATED").Inc()
+    return nil, err
+}
 
-	log.Printf("🟢 [Satpam Unary] Tiket valid! Mempersilakan tamu masuk ke: %s", info.FullMethod)
-	// Persilakan tamu masuk ke fungsi tujuan aslinya
-	return handler(ctx, req)
+	resp, err := handler(ctx, req)
+if err != nil {
+    grpcRequestsTotal.WithLabelValues(info.FullMethod, "ERROR").Inc()
+} else {
+    grpcRequestsTotal.WithLabelValues(info.FullMethod, "OK").Inc()
+}
+return resp, err
+
 }
 
 // 3. Satpam untuk Streaming RPC (LiveChat)
@@ -371,6 +436,7 @@ func authStreamInterceptor(
 
 func main() {
 	// 0. Hubungkan ke Redis In-Memory Cache
+	initMetrics()
 	initRedis()
 	initRabbitMQ()
 	initKafka()

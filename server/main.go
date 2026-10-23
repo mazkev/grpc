@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -330,64 +329,36 @@ func (s *server) ListProducts(ctx context.Context, req *pb.ListProductsRequest) 
 	}, nil
 }
 
-// Implementasi Bidirectional Streaming RPC: LiveChat
+// Implementasi Bidirectional Streaming RPC: LiveChat (Auto-Responder Bot Gudang)
 func (s *server) LiveChat(stream grpc.BidiStreamingServer[pb.ChatMessage, pb.ChatResponse]) error {
-	fmt.Println("\n==================================================")
-	fmt.Println("💬 [Server] SESI CHAT GUDANG DENGAN KASIR DIMULAI!")
-	fmt.Println("   Ketik balasan Anda lalu tekan [ENTER]")
-	fmt.Println("==================================================")
+	log.Println("💬 [Server] Sesi LiveChat dibuka oleh Kasir!")
 
-	done := make(chan struct{})
-
-	// 1. Goroutine Background: Terus mendengarkan pesan masuk dari Kasir
-	go func() {
-		for {
-			msg, err := stream.Recv()
-			if err == io.EOF {
-				fmt.Println("\n🚪 [Server] Kasir telah mengakhiri obrolan.")
-				close(done)
-				return
-			}
-			if err != nil {
-				log.Printf("⚠️  [Server] Error menerima pesan kasir: %v", err)
-				close(done)
-				return
-			}
-
-			// Cetak pesan kasir di layar Server
-			fmt.Printf("\n📩 [%s]: %s\nAnda (Gudang) > ", msg.GetSender(), msg.GetText())
-			grpcChatMessagesTotal.Inc() // Pemicu Sensor Chat Masuk (+1)
-
-		}
-	}()
-
-	// 2. Loop Utama: Membaca ketikan keyboard operator Gudang di terminal
-	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		select {
-		case <-done:
+		// 1. Terima pesan dari Kasir secara real-time
+		msg, err := stream.Recv()
+		if err == io.EOF {
+			log.Println("🚪 [Server] Kasir mengakhiri sesi obrolan.")
 			return nil
-		default:
-			fmt.Print("Anda (Gudang) > ")
-			if !scanner.Scan() {
-				return scanner.Err()
-			}
+		}
+		if err != nil {
+			log.Printf("⚠️  [Server] Error menerima pesan kasir: %v", err)
+			return err
+		}
 
-			balasan := scanner.Text()
-			if balasan == "" {
-				continue
-			}
+		log.Printf("📩 [Server] Pesan masuk dari [%s]: '%s'", msg.GetSender(), msg.GetText())
+		grpcChatMessagesTotal.Inc() // Pemicu Sensor Metrik Chat Masuk (+1)
 
-			// Kirim balasan gudang ke Kasir lewat stream
-			err := stream.Send(&pb.ChatResponse{
-				Reply: balasan,
-			})
-			if err != nil {
-				return err
-			}
+		// 2. Buat balasan pintar dari Bot Gudang Pusat
+		balasan := fmt.Sprintf("🤖 [Bot Gudang]: Halo %s! Pesanmu '%s' sudah dicatat di sistem gudang pusat.", msg.GetSender(), msg.GetText())
+
+		// 3. Kirim balasan langsung kembali ke Kasir lewat stream gRPC
+		if err := stream.Send(&pb.ChatResponse{Reply: balasan}); err != nil {
+			log.Printf("⚠️  [Server] Gagal membalas chat: %v", err)
+			return err
 		}
 	}
 }
+
 
 // 1. Fungsi Mandiri: Memeriksa Kartu Akses / Token (Satpam Pusat)
 func authorize(ctx context.Context) error {

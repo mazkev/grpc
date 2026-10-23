@@ -15,6 +15,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
+	"github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -101,6 +102,48 @@ func initRabbitMQ() {
 	log.Println("🐇 [RabbitMQ] Berhasil terhubung ke RabbitMQ di localhost:5672 ✅")
 }
 
+// Variabel Kafka Writer Global
+var kafkaWriter *kafka.Writer
+
+// Inisialisasi koneksi Kafka Producer
+func initKafka() {
+	kafkaWriter = &kafka.Writer{
+		Addr:     kafka.TCP("localhost:9092"), // Alamat external port Kafka
+		Topic:    "product-activity",          // Nama Topic buku besar transaksi
+		Balancer: &kafka.LeastBytes{},
+	}
+	log.Println("📬 [Kafka] Berhasil menginisialisasi Kafka Writer di localhost:9092 ✅")
+}
+
+// Fungsi Helper: Mengalirkan catatan event ke Kafka Commit Log
+func publishKafkaLog(key, detail string) {
+	if kafkaWriter == nil {
+		return
+	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"action":    key,
+		"detail":    detail,
+		"timestamp": time.Now().Format("2006-01-02 15:04:05"),
+	})
+
+	// Jalankan di Goroutine agar kasir tidak terhambat (Non-blocking)
+	go func() {
+		err := kafkaWriter.WriteMessages(context.Background(),
+			kafka.Message{
+				Key:   []byte(key),
+				Value: payload,
+			},
+		)
+		if err != nil {
+			log.Printf("⚠️  [Kafka] Gagal menulis ke Kafka stream: %v", err)
+		} else {
+			log.Printf("📬 [Kafka - Producer] Log dialirkan ke topic 'product-activity' [Key: %s]", key)
+		}
+	}()
+}
+
+
 // Fungsi Helper: Melempar tugas cetak invoice ke antrean RabbitMQ
 func publishInvoiceTask(product *pb.Product) {
 	if rmqChannel == nil {
@@ -180,6 +223,7 @@ func (s *server) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb
 
 		// Lempar tugas pembuatan invoice ke antrean RabbitMQ (Asinkron)
 	publishInvoiceTask(product)
+	publishKafkaLog("TRANSAKSI_PRODUK", fmt.Sprintf("ID: %s | Nama: %s | Harga: Rp %.0f", product.GetId(), product.GetName(), product.GetPrice()))
 	log.Printf("✅ [Server] Produk '%s' berhasil dikembalikan dari DB", product.GetName())
 	return &pb.GetProductResponse{
 		Product: product,
@@ -329,6 +373,7 @@ func main() {
 	// 0. Hubungkan ke Redis In-Memory Cache
 	initRedis()
 	initRabbitMQ()
+	initKafka()
 	// 1. Buka socket TCP di port 50051
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {

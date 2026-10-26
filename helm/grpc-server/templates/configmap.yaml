@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  REDIS_HOST: {{ .Values.config.redisHost | quote }}
+  KAFKA_BROKER: {{ .Values.config.kafkaBroker | quote }}

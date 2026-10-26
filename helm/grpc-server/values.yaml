@@ -1,0 +1,29 @@
+# ==========================================
+# Pusat Kendali Konfigurasi Helm
+# ==========================================
+replicaCount: 2
+
+image:
+  repository: grpc-server
+  tag: v1
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer
+  port: 50051
+  metricsPort: 2112
+
+config:
+  redisHost: "host.docker.internal:6379"
+  kafkaBroker: "host.docker.internal:9092"
+
+secret:
+  rabbitmqUrl: "amqp://guest:guest@host.docker.internal:5672/"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

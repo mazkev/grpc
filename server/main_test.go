@@ -31,6 +31,7 @@ func TestAuthorize_NoToken(t *testing.T) {
 	}
 }
 
+
 // Test 3: Menguji Satpam Interceptor ketika tamu membawa token yang benar (Harus Lolos)
 func TestAuthorize_ValidToken(t *testing.T) {
 	// Buat context dengan tiket metadata rahasia yang sah

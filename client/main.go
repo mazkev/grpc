@@ -10,7 +10,9 @@ import (
 	"time"
 
 	pb "grpc-learning/gen/product"
+	"grpc-learning/pkg/tracer"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -48,11 +50,16 @@ func clientAuthStreamInterceptor(
 
 func main() {
 	// 1. Hubungkan ke Server gRPC di port 50051
+	tp, err := tracer.InitTracer(context.Background(), "grpc-kasir-client")
+	if err == nil {
+		defer tp.Shutdown(context.Background())
+	}
 	// insecure.NewCredentials() digunakan karena di lokal kita belum memakai SSL/TLS sertifikat HTTPS
 	// Pasang asisten otomatis saat membuka koneksi ke server
 conn, err := grpc.NewClient(
     "localhost:50051",
     grpc.WithTransportCredentials(insecure.NewCredentials()),
+	grpc.WithStatsHandler(otelgrpc.NewClientHandler()), 
     grpc.WithUnaryInterceptor(clientAuthUnaryInterceptor),
     grpc.WithStreamInterceptor(clientAuthStreamInterceptor),
 )

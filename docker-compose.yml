@@ -105,6 +105,21 @@ services:
       - app-net
 
   # ==========================================
+  # 8. Distributed Tracing Collector & UI (Jaeger)
+  # ==========================================
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger-server
+    restart: unless-stopped
+    ports:
+      - "16686:16686"  # Web UI Dashboard Jaeger
+      - "4317:4317"    # OTLP gRPC Receiver (Penerima data jejak dari Go)
+      - "4318:4318"    # OTLP HTTP Receiver
+    networks:
+      - app-net
+
+
+  # ==========================================
   # 7. Core gRPC Microservice Server (Go App)
   # ==========================================
   grpc-server:

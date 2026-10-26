@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	pb "grpc-learning/gen/product"
+	"grpc-learning/pkg/tracer"
 	"io"
 
 	"log"
@@ -18,6 +19,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -188,10 +191,14 @@ func initKafka() {
 
 
 // Fungsi Helper: Mengalirkan catatan event ke Kafka Commit Log
-func publishKafkaLog(key, detail string) {
+func publishKafkaLog(ctx context.Context, key, detail string) {
 	if kafkaWriter == nil {
 		return
 	}
+
+	tr := otel.Tracer("grpc-server")
+	_, span := tr.Start(ctx, "Kafka Publish Log")
+	defer span.End()
 
 	payload, _ := json.Marshal(map[string]string{
 		"action":    key,
@@ -216,11 +223,16 @@ func publishKafkaLog(key, detail string) {
 }
 
 
+
 // Fungsi Helper: Melempar tugas cetak invoice ke antrean RabbitMQ
-func publishInvoiceTask(product *pb.Product) {
+func publishInvoiceTask(ctx context.Context, product *pb.Product) {
 	if rmqChannel == nil {
 		return
 	}
+
+	tr := otel.Tracer("grpc-server")
+	_, span := tr.Start(ctx, "RabbitMQ Publish Invoice")
+	defer span.End()
 
 	// Bungkus data tugas dalam bentuk JSON
 	payload, _ := json.Marshal(map[string]any{
@@ -251,19 +263,24 @@ func publishInvoiceTask(product *pb.Product) {
 }
 
 
+
 // Struct Server yang Mengimplementasikan Service gRPC
 type server struct {
 	pb.UnimplementedProductServiceServer
 }
 
-// Implementasi Unary RPC: GetProduct dengan Cache-Aside Pattern
+// Implementasi Unary RPC: GetProduct dengan Cache-Aside Pattern & OpenTelemetry Tracing
 func (s *server) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.GetProductResponse, error) {
+	tr := otel.Tracer("grpc-server")
 	log.Printf("📥 [Server] Kasir mencari produk dengan ID: '%s'", req.GetId())
 	cacheKey := "product:" + req.GetId()
 
 	// 1. LANGKAH PERTAMA: Cek ke Redis Cache dulu (Meja Cepat)
 	if rdb != nil {
-		cachedData, err := rdb.Get(ctx, cacheKey).Result()
+		redisCtx, redisSpan := tr.Start(ctx, "Redis Cache Lookup")
+		cachedData, err := rdb.Get(redisCtx, cacheKey).Result()
+		redisSpan.End()
+
 		if err == nil {
 			var prod pb.Product
 			// Bongkar JSON dari Redis menjadi struct Product Go
@@ -279,10 +296,12 @@ func (s *server) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb
 	// 2. LANGKAH KEDUA (Cache MISS): Produk belum ada di Redis, ambil dari DB
 	log.Printf("🐢 [Server - Cache MISS] ...")
 	cacheMissesTotal.Inc() // Pemicu Sensor Cache Miss (+1)
-	time.Sleep(2 * time.Second) // Simulasi lambat membaca disk database
 
-	// Cari produk di database memori
+	_, dbSpan := tr.Start(ctx, "Database Disk Query (Simulated)")
+	time.Sleep(2 * time.Second) // Simulasi lambat membaca disk database
 	product, found := productDB[req.GetId()]
+	dbSpan.End()
+
 	if !found {
 		log.Printf("⚠️  [Server] Produk ID '%s' tidak ditemukan di DB!", req.GetId())
 		return nil, status.Errorf(codes.NotFound, "produk dengan ID '%s' tidak ditemukan di gudang", req.GetId())
@@ -291,20 +310,21 @@ func (s *server) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb
 	// 3. LANGKAH KETIGA: Simpan fotokopi hasil DB ke Redis (TTL: 60 detik)
 	if rdb != nil {
 		if bytes, err := json.Marshal(product); err == nil {
-			rdb.Set(context.Background(), cacheKey, string(bytes), 60*time.Second)
+			saveCtx, saveSpan := tr.Start(ctx, "Redis Cache Save")
+			_ = rdb.Set(saveCtx, cacheKey, string(bytes), 60*time.Second).Err()
+			saveSpan.End()
 			log.Printf("💾 [Server - Cache SAVED] Produk '%s' disimpan ke Redis (TTL: 60 detik)", req.GetId())
 		}
 	}
 
-		// Lempar tugas pembuatan invoice ke antrean RabbitMQ (Asinkron)
-	publishInvoiceTask(product)
-	publishKafkaLog("TRANSAKSI_PRODUK", fmt.Sprintf("ID: %s | Nama: %s | Harga: Rp %.0f", product.GetId(), product.GetName(), product.GetPrice()))
+	// Lempar tugas pembuatan invoice ke antrean RabbitMQ (Asinkron)
+	publishInvoiceTask(ctx, product)
+	publishKafkaLog(ctx, "TRANSAKSI_PRODUK", fmt.Sprintf("ID: %s | Nama: %s | Harga: Rp %.0f", product.GetId(), product.GetName(), product.GetPrice()))
 	log.Printf("✅ [Server] Produk '%s' berhasil dikembalikan dari DB", product.GetName())
 	return &pb.GetProductResponse{
 		Product: product,
 	}, nil
 }
-
 
 // Implementasi Unary RPC: ListProducts (Mendukung repeated & filter enum)
 func (s *server) ListProducts(ctx context.Context, req *pb.ListProductsRequest) (*pb.ListProductsResponse, error) {
@@ -424,11 +444,25 @@ func authStreamInterceptor(
 
 
 func main() {
-	// 0. Hubungkan ke Redis In-Memory Cache
+
+	
+	// 0. Hubungkan ke Jaeger Distributed Tracing
+	tp, err := tracer.InitTracer(context.Background(), "grpc-server")
+	if err != nil {
+		log.Printf("⚠️  [Tracer] Gagal inisialisasi OpenTelemetry: %v", err)
+	} else {
+		defer func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				log.Printf("⚠️  [Tracer] Gagal shutdown TracerProvider: %v", err)
+			}
+		}()
+	}
+
 	initMetrics()
 	initRedis()
 	initRabbitMQ()
 	initKafka()
+
 	// 1. Buka socket TCP di port 50051
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
@@ -437,6 +471,7 @@ func main() {
 
 	// Pasang kedua satpam di pintu masuk server gRPC
 	grpcServer := grpc.NewServer(
+	grpc.StatsHandler(otelgrpc.NewServerHandler()),
     grpc.UnaryInterceptor(authUnaryInterceptor),
     grpc.StreamInterceptor(authStreamInterceptor),
 )

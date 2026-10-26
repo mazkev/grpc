@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-server-deployment
+  labels:
+    app: grpc-server
+spec:
+  replicas: 3  # Mandor K8s diperintahkan menjaga 3 Pod kembar sekaligus!
+  selector:
+    matchLabels:
+      app: grpc-server
+  template:
+    metadata:
+      labels:
+        app: grpc-server
+    spec:
+      containers:
+        - name: grpc-server-container
+          image: grpc-server:v1
+          imagePullPolicy: IfNotPresent  # Gunakan image lokal 20MB yang sudah kita buat!
+          ports:
+            - containerPort: 50051
+              name: grpc
+            - containerPort: 2112
+              name: metrics
+          env:
+            - name: REDIS_HOST
+              value: "host.docker.internal:6379"
+            - name: RABBITMQ_URL
+              value: "amqp://guest:guest@host.docker.internal:5672/"
+            - name: KAFKA_BROKER
+              value: "host.docker.internal:9092"

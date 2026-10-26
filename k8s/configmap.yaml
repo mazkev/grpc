@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grpc-server-config
+  labels:
+    app: grpc-server
+data:
+  REDIS_HOST: "host.docker.internal:6379"
+  KAFKA_BROKER: "host.docker.internal:9092"

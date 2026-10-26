@@ -23,10 +23,10 @@ spec:
               name: grpc
             - containerPort: 2112
               name: metrics
-          env:
-            - name: REDIS_HOST
-              value: "host.docker.internal:6379"
-            - name: RABBITMQ_URL
-              value: "amqp://guest:guest@host.docker.internal:5672/"
-            - name: KAFKA_BROKER
-              value: "host.docker.internal:9092"
+          envFrom:
+            # Tarik semua data dari ConfigMap
+            - configMapRef:
+                name: grpc-server-config
+            # Tarik semua data rahasia dari Secret
+            - secretRef:
+                name: grpc-server-secret

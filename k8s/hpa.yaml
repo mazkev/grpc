@@ -1,0 +1,20 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: grpc-server-hpa
+  labels:
+    app: grpc-server
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: grpc-server-deployment
+  minReplicas: 2   # Saat sepi, cukup pelihara 2 Pod saja
+  maxReplicas: 10  # Saat banjir traffic kasir, kembangkan hingga 10 Pod!
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50  # Picu scaling jika CPU tembus > 50%

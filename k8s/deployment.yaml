@@ -23,6 +23,14 @@ spec:
               name: grpc
             - containerPort: 2112
               name: metrics
+          resources:
+            requests:
+              cpu: "50m"         # 50 millicores (0.05 core CPU)
+              memory: "64Mi"     # 64 Megabytes RAM
+            limits:
+              cpu: "200m"        # Maksimal 0.2 core CPU
+              memory: "128Mi"    # Maksimal 128 Megabytes RAM
+
           envFrom:
             # Tarik semua data dari ConfigMap
             - configMapRef:
@@ -30,3 +38,21 @@ spec:
             # Tarik semua data rahasia dari Secret
             - secretRef:
                 name: grpc-server-secret
+       # ==========================================
+          # 1. Sensor Kesiapan (Readiness Probe)
+          # ==========================================
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 2112
+            initialDelaySeconds: 3   # Tunggu 3 detik setelah kontainer menyala sebelum mulai mengecek
+            periodSeconds: 5         # Uji kesehatan setiap 5 detik sekali
+          # ==========================================
+          # 2. Sensor Denyut Jantung (Liveness Probe)
+          # ==========================================
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 2112
+            initialDelaySeconds: 5   # Tunggu 5 detik sebelum dokter liveness mulai bekerja
+            periodSeconds: 10        # Cek setiap 10 detik sekali

@@ -36,6 +36,13 @@ jobs:
 
       - name: 5. Eksekusi Unit Tests
         run: go test -v ./...
+      
+      - name: 6. Install Helm CLI di Runner
+        uses: azure/setup-helm@v4
+
+      - name: 7. Validasi & Lint Helm Chart
+        run: helm lint ./helm/grpc-server
+
 
   # ==========================================
   # STAGE 2: Continuous Delivery (CD)

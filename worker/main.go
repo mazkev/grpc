@@ -3,76 +3,83 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type EventMessage struct {
-	Event     string `json:"event"`
-	Sender    string `json:"sender,omitempty"`
-	Detail    string `json:"detail"`
-	Timestamp string `json:"timestamp"`
+type InvoiceTask struct {
+	Event       string  `json:"event"`
+	ProductID   string  `json:"product_id"`
+	ProductName string  `json:"product_name"`
+	Price       float64 `json:"price"`
+	CreatedAt   string  `json:"created_at"`
 }
 
 func main() {
-	log.Println("🐇 [Worker] Menghubungkan worker ke RabbitMQ di localhost:5672...")
-
-	// 1. Konek ke server RabbitMQ
+	// 1. Hubungkan ke RabbitMQ Server
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		log.Fatalf("❌ [Worker] Gagal konek ke RabbitMQ: %v", err)
+		log.Fatalf("❌ Worker gagal terhubung ke RabbitMQ: %v", err)
 	}
 	defer conn.Close()
 
-	// 2. Buka Channel komunikasi
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("❌ [Worker] Gagal membuka channel: %v", err)
+		log.Fatalf("❌ Worker gagal membuka channel: %v", err)
 	}
 	defer ch.Close()
 
-	// 3. Pastikan antrean (Queue) bernama 'event_queue' sudah terdaftar
+	// 2. Pastikan antrean 'order_queue' yang ingin diserap sudah ada
 	q, err := ch.QueueDeclare(
-		"event_queue", // Nama antrean
-		true,          // durable (antrean tetap aman walau RabbitMQ restart)
-		false,         // delete when unused
-		false,         // exclusive
-		false,         // no-wait
-		nil,           // arguments
+		"order_queue",
+		true,
+		false,
+		false,
+		false,
+		nil,
 	)
 	if err != nil {
-		log.Fatalf("❌ [Worker] Gagal mendeklarasikan antrean: %v", err)
+		log.Fatalf("❌ Worker gagal deklarasi antrean: %v", err)
 	}
 
-	// 4. Dengarkan pesan masuk dari antrean (Consumer)
+	// 3. Mulai serap / dengarkan aliran pesan dari antrean
 	msgs, err := ch.Consume(
 		q.Name, // Nama antrean
-		"",     // consumer tag
-		true,   // auto-ack (otomatis konfirmasi pesan diterima)
-		false,  // exclusive
-		false,  // no-local
-		false,  // no-wait
-		nil,    // args
+		"",     // Consumer tag
+		false,  // Auto-Ack: FALSE (kita kirim konfirmasi manual setelah tugas beres)
+		false,  // Exclusive
+		false,  // No-local
+		false,  // No-wait
+		nil,    // Args
 	)
 	if err != nil {
-		log.Fatalf("❌ [Worker] Gagal mendaftar consumer: %v", err)
+		log.Fatalf("❌ Worker gagal consume antrean: %v", err)
 	}
 
-	log.Println("==================================================")
-	log.Println("👷 WORKER SERVICE SIAP SIAGA!")
-	log.Println("   Menunggu event tugas dari server gRPC...")
-	log.Println("   Tekan CTRL+C untuk berhenti")
-	log.Println("==================================================")
+	log.Println("👷 [Worker] Background Worker aktif! Menunggu tugas cetak invoice dari antrean...")
+	log.Println("   (Tekan Ctrl+C untuk berhenti)")
 
-	// Loop mendengarkan pesan selamanya
-	for d := range msgs {
-		var ev EventMessage
-		if err := json.Unmarshal(d.Body, &ev); err == nil {
-			log.Printf("📩 [Worker - Tugas Masuk]: Jenis: [%s] | Pengirim: [%s] | Pesan: '%s' (Waktu: %s)",
-				ev.Event, ev.Sender, ev.Detail, ev.Timestamp)
-			log.Printf("   ⚙️  Memproses tugas background (simulasi audit log & notifikasi)... Selesai! ✅")
-		} else {
-			log.Printf("📩 [Worker - Pesan Mentah Masuk]: %s", string(d.Body))
+	// 4. Loop abadi untuk memproses setiap tugas yang masuk
+	for msg := range msgs {
+		var task InvoiceTask
+		if err := json.Unmarshal(msg.Body, &task); err != nil {
+			log.Printf("⚠️  [Worker] Gagal membaca data JSON: %v", err)
+			msg.Nack(false, false) // Tolak pesan jika rusak
+			continue
 		}
+
+		log.Println("--------------------------------------------------")
+		log.Printf("📥 [Worker] Menerima Tugas Baru: [%s] jam %s", task.Event, task.CreatedAt)
+		log.Printf("🖨️  [Worker] Sedang mencetak invoice PDF untuk '%s' (Rp %.0f)...", task.ProductName, task.Price)
+
+		// Simulasi proses cetak invoice & kirim email (butuh waktu 1.5 detik)
+		time.Sleep(1500 * time.Millisecond)
+
+		log.Printf("✅ [Worker] Invoice '%s' selesai dicetak & dikirim via email!", task.ProductName)
+		log.Println("--------------------------------------------------")
+
+		// 5. Kirim Acknowledgment ke RabbitMQ tanda tugas sukses!
+		msg.Ack(false)
 	}
 }

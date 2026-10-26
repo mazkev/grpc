@@ -27,11 +27,14 @@ const (
 // ProductServiceClient is the client API for ProductService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// 6. Service Pintu Layanan gRPC
 type ProductServiceClient interface {
+	// Unary: Ambil 1 produk
 	GetProduct(ctx context.Context, in *GetProductRequest, opts ...grpc.CallOption) (*GetProductResponse, error)
-	// Fitur Baru: Mengambil banyak produk sekaligus
+	// Unary: Ambil katalog banyak produk
 	ListProducts(ctx context.Context, in *ListProductsRequest, opts ...grpc.CallOption) (*ListProductsResponse, error)
-	// Fitur Streaming Dua Arah:
+	// Bidirectional Streaming: Chat Real-time Kasir & Gudang
 	LiveChat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChatMessage, ChatResponse], error)
 }
 
@@ -79,11 +82,14 @@ type ProductService_LiveChatClient = grpc.BidiStreamingClient[ChatMessage, ChatR
 // ProductServiceServer is the server API for ProductService service.
 // All implementations must embed UnimplementedProductServiceServer
 // for forward compatibility.
+//
+// 6. Service Pintu Layanan gRPC
 type ProductServiceServer interface {
+	// Unary: Ambil 1 produk
 	GetProduct(context.Context, *GetProductRequest) (*GetProductResponse, error)
-	// Fitur Baru: Mengambil banyak produk sekaligus
+	// Unary: Ambil katalog banyak produk
 	ListProducts(context.Context, *ListProductsRequest) (*ListProductsResponse, error)
-	// Fitur Streaming Dua Arah:
+	// Bidirectional Streaming: Chat Real-time Kasir & Gudang
 	LiveChat(grpc.BidiStreamingServer[ChatMessage, ChatResponse]) error
 	mustEmbedUnimplementedProductServiceServer()
 }

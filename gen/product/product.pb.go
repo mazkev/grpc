@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// 2. Definisi Kategori Produk (Enum)
+// 1. Enum Kategori Produk
 type Category int32
 
 const (
@@ -74,7 +74,7 @@ func (Category) EnumDescriptor() ([]byte, []int) {
 	return file_proto_product_proto_rawDescGZIP(), []int{0}
 }
 
-// 3. Definisi Model Data Produk
+// 2. Model Data Produk
 type Product struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -151,7 +151,7 @@ func (x *Product) GetCategory() Category {
 	return Category_CATEGORY_UNSPECIFIED
 }
 
-// 4. Format Request: apa yang wajib dikirim client saat ingin mencari 1 produk
+// 3. Request & Response untuk GetProduct (Unary)
 type GetProductRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -196,7 +196,6 @@ func (x *GetProductRequest) GetId() string {
 	return ""
 }
 
-// 5. Format Response: apa yang dijanjikan server untuk dikembalikan
 type GetProductResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Product       *Product               `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
@@ -241,10 +240,10 @@ func (x *GetProductResponse) GetProduct() *Product {
 	return nil
 }
 
-// 6. Request untuk melihat katalog banyak produk
+// 4. Request & Response untuk Katalog Produk (List)
 type ListProductsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	FilterCategory Category               `protobuf:"varint,1,opt,name=filter_category,json=filterCategory,proto3,enum=product.Category" json:"filter_category,omitempty"` // Jika 0 (UNSPECIFIED), kembalikan semua barang
+	FilterCategory Category               `protobuf:"varint,1,opt,name=filter_category,json=filterCategory,proto3,enum=product.Category" json:"filter_category,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -286,7 +285,6 @@ func (x *ListProductsRequest) GetFilterCategory() Category {
 	return Category_CATEGORY_UNSPECIFIED
 }
 
-// 7. Response katalog: menggunakan 'repeated' (List / Slice di Go)
 type ListProductsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Products      []*Product             `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
@@ -331,7 +329,7 @@ func (x *ListProductsResponse) GetProducts() []*Product {
 	return nil
 }
 
-// Pesan dari client
+// 5. Pesan untuk Live Chat (Streaming)
 type ChatMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Sender        string                 `protobuf:"bytes,1,opt,name=sender,proto3" json:"sender,omitempty"`
@@ -384,7 +382,6 @@ func (x *ChatMessage) GetText() string {
 	return ""
 }
 
-// Balasan dari server
 type ChatResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Reply         string                 `protobuf:"bytes,1,opt,name=reply,proto3" json:"reply,omitempty"`

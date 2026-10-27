@@ -225,6 +225,15 @@ curl.exe http://localhost:8080/swagger.json
 
 ---
 
+### 🧪 Automated End-to-End (E2E) Integration Test Suite
+Uji seluruh 6 pilar arsitektur microservices (Auth Interceptor, Redis Caching, RabbitMQ Task Queue, Kafka Event Commit Log, LiveChat Real-time Streaming, dan gRPC-Gateway REST Transcoding) hanya dengan satu komando:
+
+```powershell
+go test -v ./tests/...
+```
+
+---
+
 ## 🧪 Menu Interaktif & Skenario Pengujian Client
 
 Saat menjalankan `client/client.go`, Anda akan disambut menu interaktif:

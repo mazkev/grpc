@@ -237,6 +237,10 @@ func publishInvoiceTask(ctx context.Context, product *pb.Product) {
 		return
 	}
 
+	tr := otel.Tracer("grpc-server")
+	_, span := tr.Start(ctx, "RabbitMQ Publish Invoice")
+	defer span.End()
+
 	// Bungkus data tugas dalam bentuk JSON
 	payload, _ := json.Marshal(map[string]any{
 		"event":        "CETAK_INVOICE",
@@ -248,10 +252,6 @@ func publishInvoiceTask(ctx context.Context, product *pb.Product) {
 
 	// Jalankan di Goroutine background (Non-blocking)
 	go func() {
-		tr := otel.Tracer("grpc-server")
-		_, span := tr.Start(context.Background(), "RabbitMQ Publish Invoice")
-		defer span.End()
-
 		err := rmqChannel.PublishWithContext(
 			context.Background(),
 			"",            // Exchange default

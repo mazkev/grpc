@@ -83,10 +83,23 @@ func main() {
 	// 5. Root HTTP Router untuk melayani REST API & Swagger OpenAPI JSON
 	mux := http.NewServeMux()
 
-	// Endpoint Dokumentasi Swagger OpenAPI
+	// Endpoint Dokumentasi Swagger OpenAPI JSON
 	mux.HandleFunc("/swagger.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, "gen/openapiv2/product.swagger.json")
+	})
+
+	// Endpoint Visual Swagger UI Interaktif di Browser
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(swaggerUIHTML))
+	})
+	mux.HandleFunc("/docs/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(swaggerUIHTML))
+	})
+	mux.HandleFunc("/swagger", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/docs", http.StatusMovedPermanently)
 	})
 
 	// Endpoint Utama: Teruskan seluruh request REST ke gRPC Gateway Mux
@@ -100,7 +113,8 @@ func main() {
 	fmt.Printf("🌐 gRPC-GATEWAY (REST HTTP/JSON PROXY) AKTIF\n")
 	fmt.Printf("   HTTP Port       : http://localhost:%s\n", gatewayPort)
 	fmt.Printf("   Backend gRPC    : %s\n", grpcServerEndpoint)
-	fmt.Printf("   Swagger Docs    : http://localhost:%s/swagger.json\n", gatewayPort)
+	fmt.Printf("   Interactive UI  : http://localhost:%s/docs 🚀\n", gatewayPort)
+	fmt.Printf("   Swagger JSON    : http://localhost:%s/swagger.json\n", gatewayPort)
 	fmt.Printf("   Contoh Endpoint : GET http://localhost:%s/v1/products/E01\n", gatewayPort)
 	fmt.Printf("                   : GET http://localhost:%s/v1/products\n", gatewayPort)
 	fmt.Println("==================================================")
@@ -109,3 +123,99 @@ func main() {
 		log.Fatalf("❌ Gateway HTTP Server terhenti: %v", err)
 	}
 }
+
+// Template HTML Swagger UI Interaktif dengan CDN Resmi & Dark/Modern Design
+const swaggerUIHTML = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Enterprise gRPC-Gateway API Portal</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.11.0/favicon-32x32.png" />
+  <style>
+    body {
+      margin: 0;
+      background: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .topbar { display: none !important; }
+    .custom-header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 24px 32px;
+      color: white;
+    }
+    .custom-header h1 {
+      margin: 0 0 8px 0;
+      font-size: 26px;
+      font-weight: 700;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .custom-header p {
+      margin: 0;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .swagger-ui {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px 24px 60px;
+    }
+    .swagger-ui .info {
+      margin: 20px 0;
+    }
+    .swagger-ui .scheme-container {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px 24px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+      margin-bottom: 24px;
+    }
+    .swagger-ui .opblock {
+      border-radius: 10px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .swagger-ui .btn.authorize {
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+    .swagger-ui .btn.authorize svg {
+      fill: #38bdf8;
+    }
+  </style>
+</head>
+<body>
+  <div class="custom-header">
+    <h1>⚡ Enterprise gRPC-Gateway Developer Portal</h1>
+    <p>RESTful HTTP/JSON Interface yang otomatis di-transcode ke Backend Core gRPC (:50051) dengan Redis Cache & Distributed Tracing</p>
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" charset="UTF-8"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+  <script>
+    window.onload = function() {
+      window.ui = SwaggerUIBundle({
+        url: "/swagger.json",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout"
+      });
+    };
+  </script>
+</body>
+</html>`
+

@@ -189,9 +189,10 @@ func initKafka() {
 	}
 
 	kafkaWriter = &kafka.Writer{
-		Addr:     kafka.TCP(kafkaBroker),
-		Topic:    "product-activity", // Nama Topic buku besar transaksi
-		Balancer: &kafka.LeastBytes{},
+		Addr:                   kafka.TCP(kafkaBroker),
+		Topic:                  "product-activity", // Nama Topic buku besar transaksi
+		Balancer:               &kafka.LeastBytes{},
+		AllowAutoTopicCreation: true,
 	}
 	log.Printf("📬 [Kafka] Berhasil menginisialisasi Kafka Writer di %s ✅\n", kafkaBroker)
 }
@@ -294,8 +295,11 @@ func (s *server) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb
 			var prod pb.Product
 			// Bongkar JSON dari Redis menjadi struct Product Go
 			if err := json.Unmarshal([]byte(cachedData), &prod); err == nil {
-				log.Printf("⚡ [Server - Cache HIT] ...")
+				log.Printf("⚡ [Server - Cache HIT] Produk '%s' diambil dari Redis", prod.GetName())
 				cacheHitsTotal.Inc() // Pemicu Sensor Cache Hit (+1)
+
+				// Alirkan catatan analitik ke Kafka secara non-blocking
+				publishKafkaLog(ctx, "VIEW_PRODUK", fmt.Sprintf("ID: %s | Nama: %s | Source: Cache HIT", prod.GetId(), prod.GetName()))
 
 				return &pb.GetProductResponse{Product: &prod}, nil
 			}

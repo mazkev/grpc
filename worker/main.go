@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"os"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -17,10 +18,15 @@ type InvoiceTask struct {
 }
 
 func main() {
+	rmqURL := os.Getenv("RABBITMQ_URL")
+	if rmqURL == "" {
+		rmqURL = "amqp://guest:guest@localhost:5672/"
+	}
+
 	// 1. Hubungkan ke RabbitMQ Server
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	conn, err := amqp.Dial(rmqURL)
 	if err != nil {
-		log.Fatalf("❌ Worker gagal terhubung ke RabbitMQ: %v", err)
+		log.Fatalf("❌ Worker gagal terhubung ke RabbitMQ di %s: %v", rmqURL, err)
 	}
 	defer conn.Close()
 

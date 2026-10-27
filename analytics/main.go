@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -17,9 +18,14 @@ type ActivityLog struct {
 }
 
 func main() {
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
+	if kafkaBroker == "" {
+		kafkaBroker = "localhost:9092"
+	}
+
 	// 1. Buat Kafka Reader yang mendengarkan topic 'product-activity'
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     []string{"localhost:9092"},
+		Brokers:     []string{kafkaBroker},
 		Topic:       "product-activity",
 		GroupID:     "analytics-group",
 		StartOffset: kafka.FirstOffset, // Baca dari awal riwayat pesan

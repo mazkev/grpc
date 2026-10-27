@@ -1,0 +1,174 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "product.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "ProductService",
+      "description": "6. Service Pintu Layanan gRPC"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/products": {
+      "get": {
+        "summary": "Unary: Ambil katalog banyak produk via HTTP REST: GET /v1/products",
+        "operationId": "ProductService_ListProducts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/productListProductsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "filterCategory",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "CATEGORY_UNSPECIFIED",
+              "ELECTRONICS",
+              "FOOD",
+              "FASHION"
+            ],
+            "default": "CATEGORY_UNSPECIFIED"
+          }
+        ],
+        "tags": [
+          "ProductService"
+        ]
+      }
+    },
+    "/v1/products/{id}": {
+      "get": {
+        "summary": "Unary: Ambil 1 produk via HTTP REST: GET /v1/products/{id}",
+        "operationId": "ProductService_GetProduct",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/productGetProductResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ProductService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "productCategory": {
+      "type": "string",
+      "enum": [
+        "CATEGORY_UNSPECIFIED",
+        "ELECTRONICS",
+        "FOOD",
+        "FASHION"
+      ],
+      "default": "CATEGORY_UNSPECIFIED",
+      "description": "1. Enum Kategori Produk"
+    },
+    "productGetProductResponse": {
+      "type": "object",
+      "properties": {
+        "product": {
+          "$ref": "#/definitions/productProduct"
+        }
+      }
+    },
+    "productListProductsResponse": {
+      "type": "object",
+      "properties": {
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/productProduct"
+          }
+        }
+      }
+    },
+    "productProduct": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "price": {
+          "type": "number",
+          "format": "double"
+        },
+        "stock": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "category": {
+          "$ref": "#/definitions/productCategory"
+        }
+      },
+      "title": "2. Model Data Produk"
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    }
+  }
+}

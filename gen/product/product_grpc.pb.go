@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v7.36.2
-// source: proto/product.proto
+// source: product.proto
 
 package productpb
 
@@ -30,9 +30,9 @@ const (
 //
 // 6. Service Pintu Layanan gRPC
 type ProductServiceClient interface {
-	// Unary: Ambil 1 produk
+	// Unary: Ambil 1 produk via HTTP REST: GET /v1/products/{id}
 	GetProduct(ctx context.Context, in *GetProductRequest, opts ...grpc.CallOption) (*GetProductResponse, error)
-	// Unary: Ambil katalog banyak produk
+	// Unary: Ambil katalog banyak produk via HTTP REST: GET /v1/products
 	ListProducts(ctx context.Context, in *ListProductsRequest, opts ...grpc.CallOption) (*ListProductsResponse, error)
 	// Bidirectional Streaming: Chat Real-time Kasir & Gudang
 	LiveChat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ChatMessage, ChatResponse], error)
@@ -85,9 +85,9 @@ type ProductService_LiveChatClient = grpc.BidiStreamingClient[ChatMessage, ChatR
 //
 // 6. Service Pintu Layanan gRPC
 type ProductServiceServer interface {
-	// Unary: Ambil 1 produk
+	// Unary: Ambil 1 produk via HTTP REST: GET /v1/products/{id}
 	GetProduct(context.Context, *GetProductRequest) (*GetProductResponse, error)
-	// Unary: Ambil katalog banyak produk
+	// Unary: Ambil katalog banyak produk via HTTP REST: GET /v1/products
 	ListProducts(context.Context, *ListProductsRequest) (*ListProductsResponse, error)
 	// Bidirectional Streaming: Chat Real-time Kasir & Gudang
 	LiveChat(grpc.BidiStreamingServer[ChatMessage, ChatResponse]) error
@@ -198,5 +198,5 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "proto/product.proto",
+	Metadata: "product.proto",
 }

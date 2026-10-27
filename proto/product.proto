@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package product;
 
+import "google/api/annotations.proto";
+
 option go_package = "grpc-learning/gen/product;productpb";
 
 // 1. Enum Kategori Produk
@@ -51,11 +53,19 @@ message ChatResponse {
 
 // 6. Service Pintu Layanan gRPC
 service ProductService {
-  // Unary: Ambil 1 produk
-  rpc GetProduct (GetProductRequest) returns (GetProductResponse);
+  // Unary: Ambil 1 produk via HTTP REST: GET /v1/products/{id}
+  rpc GetProduct (GetProductRequest) returns (GetProductResponse) {
+    option (google.api.http) = {
+      get: "/v1/products/{id}"
+    };
+  }
 
-  // Unary: Ambil katalog banyak produk
-  rpc ListProducts (ListProductsRequest) returns (ListProductsResponse);
+  // Unary: Ambil katalog banyak produk via HTTP REST: GET /v1/products
+  rpc ListProducts (ListProductsRequest) returns (ListProductsResponse) {
+    option (google.api.http) = {
+      get: "/v1/products"
+    };
+  }
 
   // Bidirectional Streaming: Chat Real-time Kasir & Gudang
   rpc LiveChat (stream ChatMessage) returns (stream ChatResponse);

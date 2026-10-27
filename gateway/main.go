@@ -124,84 +124,39 @@ func main() {
 	}
 }
 
-// Template HTML Swagger UI Interaktif dengan CDN Resmi & Dark/Modern Design
+// Template HTML Resmi Bawaan (Default) Swagger UI
 const swaggerUIHTML = `<!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Enterprise gRPC-Gateway API Portal</title>
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
-  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.11.0/favicon-32x32.png" />
+  <meta charset="UTF-8">
+  <title>Swagger UI - gRPC Product Service</title>
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.11.0/favicon-32x32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.11.0/favicon-16x16.png" sizes="16x16" />
   <style>
+    html {
+      box-sizing: border-box;
+      overflow: -moz-scrollbars-vertical;
+      overflow-y: scroll;
+    }
+    *,
+    *:before,
+    *:after {
+      box-sizing: inherit;
+    }
     body {
       margin: 0;
-      background: #0f172a;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    .topbar { display: none !important; }
-    .custom-header {
-      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-      border-bottom: 1px solid #334155;
-      padding: 24px 32px;
-      color: white;
-    }
-    .custom-header h1 {
-      margin: 0 0 8px 0;
-      font-size: 26px;
-      font-weight: 700;
-      color: #38bdf8;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .custom-header p {
-      margin: 0;
-      color: #94a3b8;
-      font-size: 14px;
-    }
-    .swagger-ui {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px 24px 60px;
-    }
-    .swagger-ui .info {
-      margin: 20px 0;
-    }
-    .swagger-ui .scheme-container {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 16px 24px;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
-      margin-bottom: 24px;
-    }
-    .swagger-ui .opblock {
-      border-radius: 10px;
-      margin-bottom: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-    }
-    .swagger-ui .btn.authorize {
-      border-color: #38bdf8;
-      color: #38bdf8;
-    }
-    .swagger-ui .btn.authorize svg {
-      fill: #38bdf8;
+      background: #fafafa;
     }
   </style>
 </head>
 <body>
-  <div class="custom-header">
-    <h1>⚡ Enterprise gRPC-Gateway Developer Portal</h1>
-    <p>RESTful HTTP/JSON Interface yang otomatis di-transcode ke Backend Core gRPC (:50051) dengan Redis Cache & Distributed Tracing</p>
-  </div>
   <div id="swagger-ui"></div>
   <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" charset="UTF-8"></script>
   <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
   <script>
     window.onload = function() {
-      window.ui = SwaggerUIBundle({
+      const ui = SwaggerUIBundle({
         url: "/swagger.json",
         dom_id: '#swagger-ui',
         deepLinking: true,
@@ -214,8 +169,10 @@ const swaggerUIHTML = `<!DOCTYPE html>
         ],
         layout: "StandaloneLayout"
       });
+      window.ui = ui;
     };
   </script>
 </body>
 </html>`
+
 

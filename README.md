@@ -1,13 +1,13 @@
-# ⚡ Enterprise Distributed Microservice System (Go, gRPC, Redis, RabbitMQ, Kafka, Prometheus & Grafana)
+# ⚡ Enterprise Distributed Microservice Ecosystem (Go, gRPC, Redis, RabbitMQ, Kafka, OpenTelemetry, Jaeger, Prometheus & Grafana)
 
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-K8s-326CE5?style=flat&logo=kubernetes)](https://kubernetes.io/)
 [![Helm](https://img.shields.io/badge/Helm-v4-0F1689?style=flat&logo=helm)](https://helm.sh/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?style=flat&logo=githubactions)](https://github.com/features/actions)
-
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![gRPC](https://img.shields.io/badge/gRPC-v1.84-244c5a?style=flat&logo=grpc)](https://grpc.io/)
-[![Protocol Buffers](https://img.shields.io/badge/Protocol%20Buffers-v3-blue?style=flat)](https://protobuf.dev/)
-[![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker)](https://www.docker.com/)
+[![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%202.0-85EA2D?style=flat&logo=swagger)](https://swagger.io/)
+[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Tracing-7A3997?style=flat&logo=opentelemetry)](https://opentelemetry.io/)
+[![Jaeger](https://img.shields.io/badge/Jaeger-Distributed%20Tracing-60D0E4?style=flat&logo=jaeger)](https://www.jaegertracing.io/)
 [![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?style=flat&logo=redis)](https://redis.io/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-AMQP-FF6600?style=flat&logo=rabbitmq)](https://www.rabbitmq.com/)
 [![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-KRaft-231F20?style=flat&logo=apachekafka)](https://kafka.apache.org/)
@@ -15,54 +15,63 @@
 [![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?style=flat&logo=grafana)](https://grafana.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Implementasi arsitektur **Distributed Microservices Enterprise** dari nol menggunakan bahasa pemrograman **Go**. Sistem ini menggabungkan protokol transfer berkecepatan tinggi (**gRPC & Protobuf v3**), in-memory caching (**Redis**), pemrosesan antrean tugas asinkron (**RabbitMQ**), pemrosesan streaming log data berskala besar (**Apache Kafka KRaft**), serta observabilitas dan metrik real-time (**Prometheus & Grafana**).
+Implementasi arsitektur **Enterprise Microservices Ecosystem** dari nol menggunakan bahasa pemrograman **Go**. Sistem ini menggabungkan protokol transfer berkecepatan tinggi (**gRPC & Protobuf v3**), reverse proxy REST HTTP/JSON (**gRPC-Gateway & Swagger OpenAPI**), in-memory caching (**Redis**), antrean pemrosesan asinkron (**RabbitMQ**), pemrosesan streaming log berskala besar (**Apache Kafka KRaft**), observabilitas metrik real-time (**Prometheus & Grafana**), serta pelacakan jejak terdistribusi (**OpenTelemetry & Jaeger**).
 
 ---
 
 ## 🏗️ Arsitektur Sistem Terdistribusi
 
 ```text
-                                  ┌───────────────────────────┐
-                                  │    CLIENT (Kasir App)     │
-                                  │   - Unary Request         │
-                                  │   - LiveChat Bidi Stream  │
-                                  │   - Auto-Inject Token     │
-                                  └─────────────┬─────────────┘
-                                                │ HTTP/2 (Binary Protobuf)
-                                                ▼
+                                   ┌───────────────────────────┐         ┌───────────────────────────┐
+                                   │    CLIENT (Kasir App)     │         │ Web Browser / REST Client │
+                                   │   - Unary Request         │         │ - HTTP GET /v1/products   │
+                                   │   - LiveChat Bidi Stream  │         │ - Swagger UI (:8080/docs) │
+                                   │   - Auto-Inject Token     │         │ - curl CLI                │
+                                   └─────────────┬─────────────┘         └─────────────┬─────────────┘
+                                                 │ HTTP/2 (Protobuf)                   │ HTTP/1.1 JSON
+                                                 │                                     ▼
+                                                 │                       ┌───────────────────────────┐
+                                                 │                       │  gRPC-GATEWAY PROXY (:8080│
+                                                 │                       │  - HTTP/JSON to gRPC      │
+                                                 │                       │  - CORS & Header Matcher  │
+                                                 │                       │  - Swagger UI /docs       │
+                                                 │                       └─────────────┬─────────────┘
+                                                 │                                     │ gRPC Unary
+                                                 ▼                                     ▼
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
 │                                   CORE gRPC SERVER (:50051)                               │
 │                                                                                           │
-│  [Server Interceptor / Middleware Auth & Logging]                                         │
+│  [Server Interceptor / Middleware Auth, Tracing & Metrics]                                │
 │  - Verifikasi Secret Token Metadata                                                       │
+│  - OpenTelemetry Distributed Tracing Handler (Jaeger)                                     │
 │  - Expose Metrics HTTP :2112/metrics                                                      │
 │                                                                                           │
 │       ┌───────────────────────┬────────────────────────┬───────────────────────┐          │
 │       ▼                       ▼                        ▼                       ▼          │
-│  [GetProduct]          [ListProducts]           [LiveChat Stream]     [Cache-Aside Layer] │
-│  - Async Processing    - Filter Kategori        - Realtime Chat       - Redis (:6379)     │
-│  - Produce AMQP &      - Repeated Product       - Goroutine & Chan    - TTL 60s           │
-│    Kafka Events          Binary Payload         - Message Metrics     - Sub-millisecond   │
+│  [GetProduct]          [ListProducts]           [LiveChat Stream]     [Cache Pre-Warming] │
+│  - Sub-3ms Latency     - Filter Kategori        - Realtime Chat       - Redis (:6379)     │
+│  - Non-blocking Async  - Repeated Product       - Goroutine & Chan    - Pre-warmed Memory │
+│    AMQP & Kafka          Binary Payload         - Message Metrics     - 0ms Cold Penalty  │
 └──────────┬─────────────────────────────────────────────────┬───────────────────┬──────────┘
-           │ AMQP (Invoice Job)                              │ Event Streaming   │ Scrape Metrics
+           │ AMQP (Invoice Job)                              │ Event Streaming   │ OTLP Traces & Metrics
            ▼                                                 ▼                   ▼
 ┌──────────────────────┐                          ┌──────────────────────┐  ┌──────────────────┐
-│   RabbitMQ (:5672)   │                          │  Apache Kafka (:9092)│  │Prometheus (:9090)│
-│  - Task Queue        │                          │  - KRaft Mode Log    │  │ - Pull :2112     │
-│  - Management :15672 │                          │  - Kafka-UI (:8080)  │  │ - 2s Interval    │
+│   RabbitMQ (:5672)   │                          │  Apache Kafka (:9092)│  │ Jaeger (:16686)  │
+│  - Task Queue        │                          │  - KRaft Mode Log    │  │ Prometheus(:9090)│
+│  - Management :15672 │                          │  - Topic: activity   │  │ Grafana (:3000)  │
 └──────────┬───────────┘                          └──────────┬───────────┘  └────────┬─────────┘
            │ Consume Job                                     │ Stream Log            │ Visualisasi
            ▼                                                 ▼                       ▼
 ┌──────────────────────┐                          ┌──────────────────────┐  ┌──────────────────┐
-│  Worker (Go Service) │                          │ Analytics Engine (Go)│  │ Grafana (:3000)  │
-│ - Cetak Invoice      │                          │ - Big Data Consumer  │  │ - Realtime Chart │
-│ - Notifikasi Email   │                          │ - Sales & Audit Log  │  │ - Auto-Dashboard │
+│  Worker (Go Service) │                          │ Analytics Engine (Go)│  │ Grafana Dashboard│
+│ - Cetak Invoice PDF  │                          │ - Big Data Consumer  │  │ - Realtime Chart │
+│ - Kirim Email Notif  │                          │ - Sales & Audit Log  │  │ - Auto-Dashboard │
 └──────────────────────┘                          └──────────────────────┘  └──────────────────┘
 ```
 
 ---
 
-## 🧩 5 Pilar Arsitektur
+## 🧩 7 Pilar Arsitektur Enterprise
 
 ### 1. ⚡ High-Performance RPC (gRPC & Protocol Buffers v3)
 * **Binary Serialization**: Pengiriman payload biner yang jauh lebih ringkas dan hemat bandwidth dibandingkan JSON/REST.
@@ -70,63 +79,64 @@ Implementasi arsitektur **Distributed Microservices Enterprise** dari nol menggu
 * **Interceptors (Middleware)**: Autentikasi token otomatis via Metadata gRPC (`codes.Unauthenticated`) dan central logging.
 * **Deadline & Timeout Resiliency**: Propagasi pembatalan jaringan (`context.WithTimeout` & `<-ctx.Done()`) untuk membebaskan resource server seketika jika client terputus.
 
-### 2. ⚡ In-Memory High-Speed Caching (Redis)
-* **Cache-Aside Pattern**: Request data pertama membaca ke database/storage internal lalu disimpan ke Redis dengan TTL 60 detik. Request berikutnya disajikan langsung dari memori.
-* **Performa Ekstrem**: Reduksi latensi dari **~120ms** menjadi **0.3ms** (peningkatan kecepatan hingga 400x lipat).
+### 2. 🌐 gRPC-Gateway REST Reverse-Proxy & Swagger OpenAPI
+* **REST Transcoding**: Menjembatani request HTTP/1.1 JSON (misal `GET /v1/products/E01`) menjadi panggilan gRPC biner secara otomatis.
+* **CORS & Header Propagation**: Meneruskan header HTTP `Authorization` ke Metadata gRPC.
+* **Interactive Swagger UI**: Tersedia antarmuka dokumentasi resmi di `http://localhost:8080/docs` dengan tombol `Authorize 🔓` untuk mencoba API langsung dari browser.
 
-### 3. 📬 Asynchronous Message Broker (RabbitMQ)
-* **Point-to-Point Task Queue**: Server gRPC tidak menahan client untuk urusan berat (seperti pembuatan PDF invoice atau pengiriman email). Pesan dipublikasikan ke RabbitMQ `order_invoice_queue`.
-* **Worker Service**: Background worker independen yang mengonsumsi antrean secara asinkron dan menjamin keandalan pemrosesan (*task acknowledgment*).
+### 3. ⚡ In-Memory High-Speed Caching (Redis)
+* **Cache-Aside Pattern & Pre-warming**: Memanaskan katalog produk saat server startup untuk mencegah **Cache Stampede / Thundering Herd Problem**.
+* **Performa Ekstrem**: Reduksi latensi rata-rata dari **~90ms** menjadi **1–3ms** (Throughput meningkat hingga **1.870+ RPS**).
 
-### 4. 📊 Real-Time Event Streaming & Big Data (Apache Kafka)
-* **Modern KRaft Mode**: Berjalan tanpa ketergantungan Apache Zookeeper (*Zookeeper-less*).
-* **Distributed Commit Log**: Setiap transaksi produk dipublikasikan ke topic Kafka `product-events` sebagai stream log audit persisten.
-* **Consumer Analytics Engine**: Microservice analitik terpisah yang memantau pergerakan penjualan dan tren produk secara real-time.
+### 4. 📬 Asynchronous Message Broker (RabbitMQ)
+* **Point-to-Point Task Queue**: Server gRPC tidak menahan client untuk urusan berat (seperti pembuatan PDF invoice atau pengiriman email). Pesan dilempar secara asinkron ke antrean `order_queue`.
+* **Worker Service (`worker/main.go`)**: Background worker independen yang mengonsumsi antrean dan mengirimkan acknowledgment (`msg.Ack(false)`).
 
-### 5. 🔭 Observability & Monitoring (Prometheus & Grafana)
-* **Prometheus Metrics Exporter**: Mengukur `grpc_requests_total`, `grpc_request_duration_seconds`, `grpc_chat_messages_total`, `redis_cache_hits_total`, dan `redis_cache_misses_total` pada endpoint HTTP `:2112/metrics`.
-* **Grafana Live Dashboard**: Menampilkan panel visual realtime dengan auto-refresh 5 detik untuk memantau performa, latensi, traffic gRPC, pesan chat, dan efisiensi cache hit ratio.
-* **Zero-Touch Provisioning**: Dashboard dan datasource terkonfigurasi otomatis via file JSON dan YAML tanpa setup manual.
+### 5. 📊 Real-Time Event Streaming (Apache Kafka KRaft)
+* **Modern KRaft Mode**: Berjalan tanpa ketergantungan Zookeeper.
+* **Distributed Commit Log**: Setiap aktivitas transaksi dipublikasikan ke topic Kafka `product-activity`.
+* **Analytics Engine (`analytics/main.go`)**: Microservice analitik terpisah yang memantau pergerakan penjualan dan log audit secara real-time.
+
+### 6. 🔭 Observability & Monitoring (Prometheus & Grafana)
+* **Prometheus Metrics Exporter**: Mengukur metrik gRPC, efisiensi cache hit ratio, dan jumlah pesan chat di endpoint HTTP `:2112/metrics`.
+* **Grafana Live Dashboard**: Menampilkan visualisasi performa real-time di `http://localhost:3000`.
+
+### 7. 🔍 Distributed Tracing (OpenTelemetry & Jaeger)
+* **End-to-End Waterfall Tracing**: Melacak perjalanan setiap request mulai dari Gateway -> gRPC Server -> Redis Lookup -> RabbitMQ Queue -> Kafka Stream di Jaeger UI (`http://localhost:16686`).
 
 ---
 
 ## ☸️ Enterprise Kubernetes (K8s) & Cloud-Native Deployment
 
-Sistem gRPC Server ini telah sepenuhnya dikontainerisasi menggunakan **Multi-Stage Dockerfile** (~20 MB) dan siap dideploy ke cluster Kubernetes dengan fitur tingkat tinggi:
+Sistem telah sepenuhnya dikontainerisasi menggunakan **Multi-Stage Dockerfile** (~20 MB) dan siap dideploy ke cluster Kubernetes:
 
-* **High-Availability & Self-Healing**: Dikelola oleh K8s Deployment dengan 3 replika Pod kembar. Jika sebuah Pod mengalami crash, K8s otomatis melahirkan Pod baru seketika.
-* **Smart Load Balancing**: K8s Service (`type: LoadBalancer`) mendistribusikan traffic gRPC dari kasir secara merata ke seluruh Pod.
-* **12-Factor Decoupling**: Konfigurasi umum dipisah ke dalam **ConfigMap** (`REDIS_HOST`, `KAFKA_BROKER`), sedangkan kredensial rahasia diamankan di dalam **Secret** (`RABBITMQ_URL`).
-* **Health Probes**: Dilengkapi sensor otomatis **Readiness Probe** (kesiapan terima traffic) dan **Liveness Probe** (pendeteksi hang/deadlock) via endpoint HTTP Prometheus `:2112/metrics`.
-* **Horizontal Pod Autoscaler (HPA)**: Elastisitas otomatis menambah Pod hingga 10 buah saat CPU melewati 50%, dan mengecilkannya saat sepi.
+* **High-Availability & Self-Healing**: Dikelola oleh K8s Deployment dengan 3 replika Pod kembar.
+* **Smart Load Balancing**: K8s Service (`type: LoadBalancer`) mendistribusikan traffic ke seluruh Pod.
+* **12-Factor Decoupling**: Konfigurasi umum di **ConfigMap** (`REDIS_HOST`, `KAFKA_BROKER`), dan kredensial rahasia di **Secret** (`RABBITMQ_URL`).
+* **Health Probes**: Dilengkapi sensor otomatis **Readiness Probe** dan **Liveness Probe** via endpoint `:2112/metrics`.
+* **Horizontal Pod Autoscaler (HPA)**: Elastisitas otomatis menambah Pod hingga 10 buah saat CPU melewati 50%.
 
-### Menjalankan di Kubernetes via Manifest:
 ```powershell
-# 1. Terapkan seluruh manifest K8s (Deployment, Service, ConfigMap, Secret, HPA)
+# Deploy ke Kubernetes
 kubectl apply -f k8s/
-
-# 2. Pantau status Pod dan HPA
 kubectl get pods -l app=grpc-server
 kubectl get hpa
 ```
 
 ---
 
-## ⎈ Helm Chart Management (The K8s Package Manager)
+## ⎈ Helm Chart Management
 
-Seluruh konfigurasi Kubernetes dikemas ke dalam **Helm Chart** modular di folder `helm/grpc-server/` dengan pusat kendali di `values.yaml`.
+Seluruh konfigurasi Kubernetes dikemas ke dalam **Helm Chart** modular di folder `helm/grpc-server/` dengan pusat kendali di `values.yaml`:
 
 ```powershell
-# 1. Install aplikasi gRPC via Helm
+# Install aplikasi via Helm
 helm install my-grpc ./helm/grpc-server
 
-# 2. Instant Scale ke 4 Pod tanpa menyentuh file YAML
+# Scale ke 4 Pod
 helm upgrade my-grpc ./helm/grpc-server --set replicaCount=4
 
-# 3. Cek Riwayat Rilis
-helm history my-grpc
-
-# 4. Rollback instan ke versi sebelumnya jika terjadi insiden
+# Rollback instan jika insiden
 helm rollback my-grpc 1
 ```
 
@@ -135,92 +145,60 @@ helm rollback my-grpc 1
 ## 🤖 CI/CD Pipeline Otomatis (GitHub Actions)
 
 Alur integrasi dan pengiriman otomatis (*Continuous Integration & Delivery*) diatur dalam file `.github/workflows/ci-cd.yml`:
-
-1. **Stage 1 (CI - Continuous Integration)**:
-   * Checkout kode & setup lingkungan Go.
-   * Static Code Analysis dengan `go vet ./...`.
-   * Eksekusi Automated Unit Testing (`go test -v ./...`).
-   * Validasi sintaks dan template Helm (`helm lint ./helm/grpc-server`).
-   * **Quality Gate**: Jika ada test atau lint yang gagal, proses langsung dihentikan!
-2. **Stage 2 (CD - Continuous Delivery)**:
-   * Mengompilasi Dockerfile multi-stage langsung di cloud runner Ubuntu.
-   * Menerbitkan dan mengunggah (*push*) image kontainer ke **GitHub Container Registry (GHCR)**: `ghcr.io/mazkev/grpc/grpc-server:latest`.
+1. **CI (Test & Lint)**: Static analysis (`go vet`), automated unit tests (`go test`), dan validasi template Helm (`helm lint`).
+2. **CD (Container Registry)**: Build Docker image dan push ke **GitHub Container Registry (GHCR)**: `ghcr.io/mazkev/grpc/grpc-server:latest`.
 
 ---
 
 ## 🌐 Port & Web Management Dashboard
 
-| Service | Port | Tipe Akses | Kredensial Default |
+| Service | Port / URL | Tipe Akses | Keterangan |
 | :--- | :--- | :--- | :--- |
-| **gRPC Server** | `50051` | TCP / gRPC RPC | Metadata Token Auth |
-| **gRPC Gateway (REST)** | `8080` | HTTP / REST JSON | Header `Authorization` |
-| **Swagger OpenAPI Docs** | `8080` | HTTP (`/swagger.json`) | Public |
-| **Jaeger Distributed Tracing** | `16686` | Web UI | Public |
-| **Prometheus Exporter** | `2112` | HTTP (`/metrics`) | - |
-| **Grafana Dashboard** | `3000` | Web UI | `admin` / `admin` |
-| **Prometheus Web UI** | `9090` | Web UI | - |
-| **Kafka Broker** | `9092` | TCP / Kafka Protocol | - |
-| **RabbitMQ Broker** | `5672` | AMQP Protocol | `guest` / `guest` |
-| **RabbitMQ Management** | `15672` | Web UI | `guest` / `guest` |
-| **Redis Server** | `6379` | TCP / Redis Protocol | - |
+| **Swagger UI Interaktif** | [http://localhost:8080/docs](http://localhost:8080/docs) | Web UI | Portal dokumentasi & test REST API |
+| **gRPC Gateway (REST)** | `8080` | HTTP / REST JSON | Reverse proxy ke gRPC |
+| **Core gRPC Server** | `50051` | TCP / gRPC RPC | Metadata Token Auth |
+| **Jaeger Tracing UI** | [http://localhost:16686](http://localhost:16686) | Web UI | Distributed Tracing Dashboard |
+| **Grafana Dashboard** | [http://localhost:3000](http://localhost:3000) | Web UI | `admin` / `admin` |
+| **Prometheus Exporter** | [http://localhost:2112/metrics](http://localhost:2112/metrics) | HTTP | Metrik Sensor Prometheus |
+| **Prometheus Web UI** | [http://localhost:9090](http://localhost:9090) | Web UI | Metric Query Explorer |
+| **RabbitMQ Management** | [http://localhost:15672](http://localhost:15672) | Web UI | `guest` / `guest` |
+| **Redis Server** | `6379` | TCP / Redis Protocol | In-memory cache |
+| **Apache Kafka Broker** | `9092` | TCP / Kafka Protocol | KRaft Event Broker |
 
 ---
 
 ## 🚀 Panduan Menjalankan Sistem
 
-### 1. Menyalakan Seluruh Infrastruktur (1-Click)
-Jalankan seluruh infrastruktur (Redis, RabbitMQ, Kafka, Kafka-UI, Prometheus, Grafana) hanya dengan satu perintah:
-
+### 1. Menyalakan Infrastruktur (1-Click)
 ```powershell
 docker compose up -d
 ```
 
-> **Verifikasi**: Buka **[http://localhost:3000/d/grpc-overview](http://localhost:3000/d/grpc-overview)** untuk membuka Dashboard Grafana langsung.
-
----
-
 ### 2. Menjalankan Microservices Backend (Terminal Terpisah)
-
-Buka 4 terminal untuk menjalankan masing-masing service:
 
 #### Terminal 1: Core gRPC Server
 ```powershell
 go run ./server/main.go
 ```
-*Server aktif di `:50051` dan mengekspos metrik Prometheus di `:2112/metrics`.*
 
-#### Terminal 2: RabbitMQ Worker (Invoice & Email)
-```powershell
-go run ./worker/main.go
-```
-*Siap memproses antrean cetak invoice dan notifikasi asinkron.*
-
-#### Terminal 3: Kafka Analytics Engine
-```powershell
-go run ./analytics/main.go
-```
-*Siap menyerap event transaksi masuk untuk agregasi data analitik.*
-
-#### Terminal 4: Client Kasir Interaktif (gRPC Client)
-```powershell
-go run ./client/main.go
-```
-
-#### Terminal 5: gRPC-Gateway REST Reverse-Proxy
+#### Terminal 2: gRPC-Gateway REST & Swagger
 ```powershell
 go run ./gateway/main.go
 ```
-*Aktif di port `:8080`, menjembatani HTTP/JSON REST clients langsung ke backend gRPC.*
 
+#### Terminal 3: RabbitMQ Worker (Invoice Printer)
 ```powershell
-# 1. Ambil 1 produk via HTTP REST (JSON)
-curl.exe -H "Authorization: token-rahasia-123" http://localhost:8080/v1/products/E01
+go run ./worker/main.go
+```
 
-# 2. Ambil katalog seluruh produk via HTTP REST
-curl.exe -H "Authorization: token-rahasia-123" http://localhost:8080/v1/products
+#### Terminal 4: Kafka Analytics Engine
+```powershell
+go run ./analytics/main.go
+```
 
-# 3. Lihat Swagger OpenAPI Schema
-curl.exe http://localhost:8080/swagger.json
+#### Terminal 5: Client Kasir Interaktif (gRPC Client)
+```powershell
+go run ./client/main.go
 ```
 
 ---
@@ -234,42 +212,20 @@ go test -v ./tests/...
 
 ---
 
-## 🧪 Menu Interaktif & Skenario Pengujian Client
+### 🚀 High-Load Stress Testing
+Jalankan load test 1.000 requests dengan 25 concurrent workers untuk menguji throughput dan latensi sub-milidetik:
 
-Saat menjalankan `client/client.go`, Anda akan disambut menu interaktif:
-
-```text
-========================================
-     APLIKASI KASIR INTERAKTIF (gRPC)
-========================================
-1. Ambil 1 Produk (Simulasi Timeout 1 Detik)
-2. Tampilkan Katalog Lengkap
-3. Live Chat Customer Service (Real-time Stream)
-4. Benchmark Redis Cache (Uji Kecepatan 1000x Request)
-5. Keluar
-========================================
+```powershell
+go run ./loadtest/main.go
 ```
-
-1. **Uji Coba Timeout Resiliency (Pilihan 1)**:
-   * Kasir memanggil produk dengan batas waktu `context.WithTimeout(1 detik)`.
-   * Server memproses selama 3 detik. Client otomatis membatalkan dengan status `DeadlineExceeded` dan server menghentikan kalkulasi seketika.
-
-2. **Uji Coba Redis Benchmark (Pilihan 4)**:
-   * Client menembak 1000 request berturut-turut.
-   * Amati di terminal dan Grafana bagaimana Redis memangkas waktu respons dari ratusan milidetik menjadi sub-milidetik.
-
-3. **Uji Coba LiveChat Dua Arah (Pilihan 3)**:
-   * Ketik pesan di terminal client dan saksikan counter **`💬 Pesan Chat LiveChat Masuk`** di Grafana bertambah secara live!
-   * Balas pesan dari terminal server gRPC secara simultan.
 
 ---
 
 ## 🛠️ Perintah Kompilasi Protobuf
-
-Jika Anda memodifikasi file [proto/product.proto](proto/product.proto), kompilasi ulang dengan perintah:
+Jika Anda memodifikasi file [proto/product.proto](proto/product.proto), kompilasi ulang seluruh Go stub, gRPC Gateway, dan Swagger OpenAPI spec dengan:
 
 ```powershell
-protoc --proto_path=. --go_out=. --go_opt=module=grpc-learning --go-grpc_out=. --go-grpc_opt=module=grpc-learning proto/product.proto
+protoc -I proto --go_out=. --go_opt=module=grpc-learning --go-grpc_out=. --go-grpc_opt=module=grpc-learning --grpc-gateway_out=. --grpc-gateway_opt=module=grpc-learning --openapiv2_out=gen/openapiv2 proto/product.proto
 ```
 
 ---
@@ -282,29 +238,34 @@ protoc --proto_path=. --go_out=. --go_opt=module=grpc-learning --go-grpc_out=. -
 │   └── ci-cd.yml                       # Pipeline GitHub Actions (Test, Lint & GHCR Push)
 ├── Dockerfile                          # Multi-stage production build (~20MB)
 ├── docker-compose.yml                  # Orkestrasi kontainer infrastruktur
-├── k8s/                                # Manifest deklaratif Kubernetes
-│   ├── deployment.yaml                 # Deployment gRPC Server & Probes
-│   ├── service.yaml                    # Service LoadBalancer
-│   ├── configmap.yaml                  # Konfigurasi non-sensitif
-│   ├── secret.yaml                     # Kredensial rahasia terenkripsi
-│   └── hpa.yaml                        # Horizontal Pod Autoscaler
-├── helm/grpc-server/                   # Helm Chart terstandar
-│   ├── Chart.yaml                      # Metadata Chart
-│   ├── values.yaml                     # Variabel kendali konfigurasi
-│   └── templates/                      # Cetakan manifest dinamis
-├── proto/product.proto                 # Kontrak Protocol Buffers v3
-├── gen/product/                        # Kode Go hasil kompilasi protoc
+├── k8s/                                # Manifest deklaratif Kubernetes (Deployment, Service, HPA)
+├── helm/grpc-server/                   # Helm Chart terstandar (values.yaml, templates)
+├── proto/
+│   ├── google/api/                     # Anotasi HTTP Google API untuk gRPC-Gateway
+│   └── product.proto                   # Kontrak Protocol Buffers v3
+├── gen/
+│   ├── product/                        # Kode Go Protobuf & Gateway hasil kompilasi
+│   └── openapiv2/                      # Swagger OpenAPI 2.0 JSON
 ├── server/
-│   ├── main.go                         # Core gRPC Server & Event Producers
-│   └── main_test.go                    # Automated Unit Tests
-├── client/main.go                      # Interactive Terminal Client Kasir
-├── worker/main.go                      # RabbitMQ Async Worker
-├── analytics/main.go                   # Kafka Realtime Stream Consumer
-├── CHEATSHEET.md                       # Kamus konsep sistem terdistribusi
-└── README.md                           # Dokumentasi komprehensif
+│   ├── main.go                         # Core gRPC Server, Redis Caching, Event Producers
+│   └── main_test.go                    # Unit Tests
+├── gateway/
+│   └── main.go                         # gRPC-Gateway REST Proxy & Swagger UI Dashboard
+├── worker/
+│   └── main.go                         # RabbitMQ Async Invoice Worker
+├── analytics/
+│   └── main.go                         # Kafka Stream Analytics Consumer
+├── client/
+│   └── main.go                         # Interactive Cashier gRPC Terminal Client
+├── loadtest/
+│   └── main.go                         # High-load Stress Testing Tool (1.000 reqs, OTel traced)
+├── tests/
+│   └── e2e_test.go                     # Automated End-to-End Integration Test Suite
+├── CHEATSHEET.md                       # Kamus konsep arsitektur sistem terdistribusi
+└── README.md                           # Dokumentasi komprehensif proyek
 ```
 
 ---
 
 ## 📖 Referensi Belajar
-* [CHEATSHEET.md](CHEATSHEET.md) — Kamus konsep distributed systems: gRPC, Redis Cache-Aside, RabbitMQ vs Kafka, dan Observability.
+* [CHEATSHEET.md](CHEATSHEET.md) — Kamus konsep distributed systems: gRPC, Redis Cache-Aside, RabbitMQ vs Kafka, OpenTelemetry Tracing, dan Observability.

@@ -126,6 +126,13 @@ func initRedis() {
 		log.Printf("⚠️  [Redis] Gagal terhubung ke Redis di %s: %v. Server tetap berjalan tanpa cache.", redisHost, err)
 	} else {
 		log.Printf("⚡ [Redis] Berhasil terhubung ke Redis di %s ✅\n", redisHost)
+		// Cache Pre-warming (Mencegah Thundering Herd / Cache Stampede)
+		for id, prod := range productDB {
+			if data, err := json.Marshal(prod); err == nil {
+				_ = rdb.Set(context.Background(), "product:"+id, string(data), 10*time.Minute).Err()
+			}
+		}
+		log.Println("🔥 [Redis] Cache Pre-warming selesai: Katalog produk siap di memory! ⚡")
 	}
 }
 
@@ -224,15 +231,11 @@ func publishKafkaLog(ctx context.Context, key, detail string) {
 
 
 
-// Fungsi Helper: Melempar tugas cetak invoice ke antrean RabbitMQ
+// Fungsi Helper: Melempar tugas cetak invoice ke antrean RabbitMQ (Asinkron Goroutine)
 func publishInvoiceTask(ctx context.Context, product *pb.Product) {
 	if rmqChannel == nil {
 		return
 	}
-
-	tr := otel.Tracer("grpc-server")
-	_, span := tr.Start(ctx, "RabbitMQ Publish Invoice")
-	defer span.End()
 
 	// Bungkus data tugas dalam bentuk JSON
 	payload, _ := json.Marshal(map[string]any{
@@ -243,23 +246,29 @@ func publishInvoiceTask(ctx context.Context, product *pb.Product) {
 		"created_at":   time.Now().Format("15:04:05"),
 	})
 
-	// Lempar pesan ke antrean 'order_queue'
-	err := rmqChannel.PublishWithContext(
-		context.Background(),
-		"",            // Exchange default
-		"order_queue", // Nama antrean tujuan
-		false,
-		false,
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        payload,
-		},
-	)
-	if err != nil {
-		log.Printf("⚠️  [RabbitMQ] Gagal melempar tugas invoice: %v", err)
-	} else {
-		log.Printf("📢 [RabbitMQ - Producer] Tugas invoice '%s' berhasil dilempar ke antrean!", product.GetName())
-	}
+	// Jalankan di Goroutine background (Non-blocking)
+	go func() {
+		tr := otel.Tracer("grpc-server")
+		_, span := tr.Start(context.Background(), "RabbitMQ Publish Invoice")
+		defer span.End()
+
+		err := rmqChannel.PublishWithContext(
+			context.Background(),
+			"",            // Exchange default
+			"order_queue", // Nama antrean tujuan
+			false,
+			false,
+			amqp.Publishing{
+				ContentType: "application/json",
+				Body:        payload,
+			},
+		)
+		if err != nil {
+			log.Printf("⚠️  [RabbitMQ] Gagal melempar tugas invoice: %v", err)
+		} else {
+			log.Printf("📢 [RabbitMQ - Producer] Tugas invoice '%s' berhasil dilempar ke antrean!", product.GetName())
+		}
+	}()
 }
 
 

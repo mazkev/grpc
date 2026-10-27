@@ -153,11 +153,13 @@ Alur integrasi dan pengiriman otomatis (*Continuous Integration & Delivery*) dia
 | Service | Port | Tipe Akses | Kredensial Default |
 | :--- | :--- | :--- | :--- |
 | **gRPC Server** | `50051` | TCP / gRPC RPC | Metadata Token Auth |
+| **gRPC Gateway (REST)** | `8080` | HTTP / REST JSON | Header `Authorization` |
+| **Swagger OpenAPI Docs** | `8080` | HTTP (`/swagger.json`) | Public |
+| **Jaeger Distributed Tracing** | `16686` | Web UI | Public |
 | **Prometheus Exporter** | `2112` | HTTP (`/metrics`) | - |
 | **Grafana Dashboard** | `3000` | Web UI | `admin` / `admin` |
 | **Prometheus Web UI** | `9090` | Web UI | - |
 | **Kafka Broker** | `9092` | TCP / Kafka Protocol | - |
-| **Kafka Web UI** | `8080` | Web UI | - |
 | **RabbitMQ Broker** | `5672` | AMQP Protocol | `guest` / `guest` |
 | **RabbitMQ Management** | `15672` | Web UI | `guest` / `guest` |
 | **Redis Server** | `6379` | TCP / Redis Protocol | - |
@@ -199,9 +201,26 @@ go run ./analytics/main.go
 ```
 *Siap menyerap event transaksi masuk untuk agregasi data analitik.*
 
-#### Terminal 4: Client Kasir Interaktif
+#### Terminal 4: Client Kasir Interaktif (gRPC Client)
 ```powershell
-go run ./client/client.go
+go run ./client/main.go
+```
+
+#### Terminal 5: gRPC-Gateway REST Reverse-Proxy
+```powershell
+go run ./gateway/main.go
+```
+*Aktif di port `:8080`, menjembatani HTTP/JSON REST clients langsung ke backend gRPC.*
+
+```powershell
+# 1. Ambil 1 produk via HTTP REST (JSON)
+curl.exe -H "Authorization: token-rahasia-123" http://localhost:8080/v1/products/E01
+
+# 2. Ambil katalog seluruh produk via HTTP REST
+curl.exe -H "Authorization: token-rahasia-123" http://localhost:8080/v1/products
+
+# 3. Lihat Swagger OpenAPI Schema
+curl.exe http://localhost:8080/swagger.json
 ```
 
 ---
